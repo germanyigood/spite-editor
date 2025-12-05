@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { SpriteConfig, AnimationConfig, BackgroundRemovalConfig, AnimationEntry, SourceLayer } from './types';
-import { sliceFrames, stitchFrames, createProjectBundle, loadProjectBundle } from './utils';
+import { sliceFrames, stitchFrames, createProjectBundle, loadProjectBundle, DEFAULT_SPRITE_CONFIG } from './utils';
 import { analyzeSpriteSheet } from './services/geminiService';
 import { GripVertical } from 'lucide-react';
 
@@ -11,12 +12,6 @@ import RightSidebar from './components/RightSidebar';
 import DropZone from './components/DropZone';
 import SpriteEditor from './components/SpriteEditor';
 import Timeline from './components/Timeline';
-
-const DEFAULT_SPRITE_CONFIG: SpriteConfig = {
-  rows: 1, cols: 1, width: 0, height: 0,
-  offsetX: 0, offsetY: 0, margin: 0,
-  totalFrames: 1, frameOffsets: {}, showCrosshair: false
-};
 
 const DEFAULT_BG_CONFIG: BackgroundRemovalConfig = {
   enabled: false, 
@@ -33,11 +28,12 @@ const App: React.FC = () => {
   // State
   const [animations, setAnimations] = useState<AnimationEntry[]>([]);
   const [activeAnimationId, setActiveAnimationId] = useState<string>('');
+  const [activeLayerId, setActiveLayerId] = useState<string | null>(null); // New: Track active layer
   const [isProcessing, setIsProcessing] = useState(false);
   const [previewWidth, setPreviewWidth] = useState(400);
   const [timelineHeight, setTimelineHeight] = useState(180);
   const [copySuccess, setCopySuccess] = useState(false);
-  const [selectedFrameIndex, setSelectedFrameIndex] = useState<number | null>(null); // Grid Index
+  const [selectedFrameIndex, setSelectedFrameIndex] = useState<number | null>(null); // Grid Index (of active layer)
   const [selectedTimelineIndex, setSelectedTimelineIndex] = useState<number | null>(null); // Timeline Index
   const [toolMode, setToolMode] = useState<'select' | 'move_layer'>('select');
   const [generatedFrames, setGeneratedFrames] = useState<string[]>([]);
@@ -63,7 +59,6 @@ const App: React.FC = () => {
         name: 'Idle',
         imageSrc: null,
         layers: [],
-        spriteConfig: { ...DEFAULT_SPRITE_CONFIG, frameOffsets: {} },
         bgConfig: { ...DEFAULT_BG_CONFIG, colors: [{color: '#00ff00', tolerance: 10}] },
         animConfig: { ...DEFAULT_ANIM_CONFIG },
         frames: []
@@ -80,7 +75,7 @@ const App: React.FC = () => {
     }
     const timer = setTimeout(async () => {
         if (currentAnim.layers.length > 0) {
-            const frames = await sliceFrames(currentAnim.layers, currentAnim.spriteConfig, currentAnim.bgConfig);
+            const frames = await sliceFrames(currentAnim.layers, currentAnim.bgConfig);
             setGeneratedFrames(frames);
         } else {
             setGeneratedFrames([]);
@@ -91,19 +86,30 @@ const App: React.FC = () => {
 
   // --- Helpers ---
 
-  const updateEntry = (id: string, updates: Partial<AnimationEntry>) => {
+  const updateEntry = useCallback((id: string, updates: Partial<AnimationEntry>) => {
     setAnimations(prev => prev.map(a => a.id === id ? { ...a, ...updates } : a));
+  }, []);
+
+  const updateLayer = (layerId: string, updates: Partial<SourceLayer>) => {
+      if (!currentAnim) return;
+      const newLayers = currentAnim.layers.map(l => l.id === layerId ? { ...l, ...updates } : l);
+      updateEntry(currentAnim.id, { layers: newLayers });
   };
 
   const updateGrid = (key: keyof SpriteConfig, value: number) => {
-    if (!currentAnim || currentAnim.layers.length === 0) return;
+    if (!currentAnim || !activeLayerId) return;
+    
+    const layer = currentAnim.layers.find(l => l.id === activeLayerId);
+    if (!layer) return;
+
     const img = new Image();
-    img.src = currentAnim.layers[0].imageSrc;
+    img.src = layer.imageSrc;
     img.onload = () => {
         const w = img.naturalWidth;
         const h = img.naturalHeight;
-        const prevConfig = currentAnim.spriteConfig;
+        const prevConfig = layer.spriteConfig;
         const next = { ...prevConfig, [key]: value };
+        
         if (key === 'rows' && value > 0) {
             next.height = Math.floor(h / value);
             next.totalFrames = value * next.cols;
@@ -112,10 +118,78 @@ const App: React.FC = () => {
             next.width = Math.floor(w / value);
             next.totalFrames = next.rows * value;
         }
+        
+        // Preserve frames not cut off? Or just auto-expand?
         next.totalFrames = Math.max(next.totalFrames, prevConfig.totalFrames);
-        updateEntry(currentAnim.id, { spriteConfig: next });
+        updateLayer(activeLayerId, { spriteConfig: next });
     };
   };
+
+  // --- Core Logic: Add Frame ---
+  
+  const handleAddFrame = useCallback((addToTimeline: boolean = false) => {
+      if (!activeLayerId || !currentAnim) {
+          alert("Please select a layer first.");
+          return;
+      }
+      
+      const layerIndex = currentAnim.layers.findIndex(l => l.id === activeLayerId);
+      if (layerIndex === -1) return;
+      const layer = currentAnim.layers[layerIndex];
+
+      const newTotal = layer.spriteConfig.totalFrames + 1;
+      const newIndex = newTotal - 1; // Local index of new frame
+      
+      const w = layer.spriteConfig.width || 64;
+      const h = layer.spriteConfig.height || 64;
+
+      // Default frame at 0,0 relative to layer
+      const newOffsets = { 
+          ...layer.spriteConfig.frameOffsets, 
+          [newIndex]: { x: 0, y: 0, w, h } 
+      };
+
+      // 1. Update Layer Config
+      const newLayers = [...currentAnim.layers];
+      newLayers[layerIndex] = {
+          ...layer,
+          spriteConfig: { ...layer.spriteConfig, totalFrames: newTotal, frameOffsets: newOffsets }
+      };
+
+      // 2. Shift Timeline Indices for subsequent layers
+      // Because we inserted a frame in a layer, the global indices of frames 
+      // in SUBSEQUENT layers must be incremented by 1.
+      let globalThreshold = 0;
+      for (let i = 0; i <= layerIndex; i++) {
+          // Use OLD totalFrames for threshold calculation since existing timeline indices 
+          // were based on the old counts.
+          globalThreshold += currentAnim.layers[i].spriteConfig.totalFrames;
+      }
+      
+      let newTimelineFrames = currentAnim.frames.map(idx => idx >= globalThreshold ? idx + 1 : idx);
+
+      // 3. Add to Timeline if requested
+      if (addToTimeline) {
+          // Calculate Global Index for the NEW frame
+          let thisLayerStart = 0;
+          for(let i=0; i<layerIndex; i++) thisLayerStart += currentAnim.layers[i].spriteConfig.totalFrames;
+          
+          const newGlobalIndex = thisLayerStart + newIndex; 
+          newTimelineFrames = [...newTimelineFrames, newGlobalIndex];
+      }
+
+      updateEntry(currentAnim.id, {
+          layers: newLayers,
+          frames: newTimelineFrames
+      });
+      
+      setSelectedFrameIndex(newIndex);
+      if (addToTimeline) {
+          setSelectedTimelineIndex(newTimelineFrames.length - 1);
+      }
+
+  }, [activeLayerId, currentAnim, updateEntry]);
+
 
   // --- Handlers ---
 
@@ -127,12 +201,12 @@ const App: React.FC = () => {
             name: 'Idle',
             imageSrc: null,
             layers: [],
-            spriteConfig: { ...DEFAULT_SPRITE_CONFIG, frameOffsets: {} },
             bgConfig: { ...DEFAULT_BG_CONFIG, colors: [{ color: '#00ff00', tolerance: 10 }] },
             animConfig: { ...DEFAULT_ANIM_CONFIG },
             frames: []
          }]);
          setActiveAnimationId(newId);
+         setActiveLayerId(null);
          setSelectedFrameIndex(null);
          setGeneratedFrames([]);
     }
@@ -146,6 +220,12 @@ const App: React.FC = () => {
         if (loadedEntries.length > 0) {
             setAnimations(loadedEntries);
             setActiveAnimationId(loadedEntries[0].id);
+            // Auto select first layer if exists
+            if (loadedEntries[0].layers.length > 0) {
+                setActiveLayerId(loadedEntries[0].layers[0].id);
+            } else {
+                setActiveLayerId(null);
+            }
             setSelectedFrameIndex(null);
         }
       } catch (e) {
@@ -164,47 +244,58 @@ const App: React.FC = () => {
         const img = new Image();
         img.onload = () => {
             if (!currentAnim) return;
+            
+            // New Layer Config Logic
+            const estimatedCols = 4;
+            const w = Math.floor(img.naturalWidth / estimatedCols);
+            const initialConfig: SpriteConfig = {
+                ...DEFAULT_SPRITE_CONFIG,
+                cols: estimatedCols,
+                rows: 1,
+                width: w,
+                height: img.naturalHeight,
+                totalFrames: estimatedCols
+            };
+
+            const newLayerId = `layer_${Date.now()}`;
             const newLayer: SourceLayer = {
-                id: `layer_${Date.now()}`,
+                id: newLayerId,
                 name: file.name,
                 imageSrc: src,
-                x: 0, y: 0, opacity: 1, visible: true
+                x: 0, y: 0, opacity: 1, visible: true,
+                spriteConfig: initialConfig
             };
-            const newLayers = [...currentAnim.layers, newLayer];
-            let newConfig = { ...currentAnim.spriteConfig };
-            let newFrames = [...currentAnim.frames];
 
-            if (currentAnim.layers.length === 0) {
-                 const estimatedCols = 4;
-                 const w = Math.floor(img.naturalWidth / estimatedCols);
-                 newConfig = { ...newConfig, cols: estimatedCols, rows: 1, width: w, height: img.naturalHeight, totalFrames: estimatedCols };
-                 newFrames = Array.from({ length: estimatedCols }, (_, i) => i);
-            }
-            updateEntry(currentAnim.id, { layers: newLayers, spriteConfig: newConfig, frames: newFrames });
+            const newLayers = [...currentAnim.layers, newLayer];
+            
+            updateEntry(currentAnim.id, { layers: newLayers });
+            setActiveLayerId(newLayerId);
         };
         img.src = src;
       }
     };
     reader.readAsDataURL(file);
-  }, [activeAnimationId, currentAnim]);
+  }, [activeAnimationId, currentAnim, updateEntry]);
 
   const handleMagicDetect = async () => {
-    if (!currentAnim || currentAnim.layers.length === 0) return;
+    if (!currentAnim || !activeLayerId) return;
     setIsProcessing(true);
-    const mainSrc = currentAnim.layers[0].imageSrc;
+    const layer = currentAnim.layers.find(l => l.id === activeLayerId);
+    if (!layer) return;
+
     try {
-      const result = await analyzeSpriteSheet(mainSrc);
+      const result = await analyzeSpriteSheet(layer.imageSrc);
       if (result) {
         const img = new Image();
-        img.src = mainSrc;
+        img.src = layer.imageSrc;
         await new Promise(r => img.onload = r);
         const { rows, cols, backgroundColor } = result;
         const newW = Math.floor(img.naturalWidth / cols);
         const newH = Math.floor(img.naturalHeight / rows);
         const total = rows * cols;
-        const allFrames = Array.from({ length: total }, (_, i) => i);
 
-        const newConfig = { ...currentAnim.spriteConfig, rows, cols, width: newW, height: newH, totalFrames: total };
+        const newConfig = { ...layer.spriteConfig, rows, cols, width: newW, height: newH, totalFrames: total };
+        
         let newBgConfig = { ...currentAnim.bgConfig };
         if (backgroundColor) {
              const exists = newBgConfig.colors.some(c => c.color.toLowerCase() === backgroundColor.toLowerCase());
@@ -213,7 +304,9 @@ const App: React.FC = () => {
                  newBgConfig.enabled = true;
              }
         }
-        updateEntry(activeAnimationId, { spriteConfig: newConfig, bgConfig: newBgConfig, frames: allFrames });
+        
+        updateLayer(activeLayerId, { spriteConfig: newConfig });
+        updateEntry(activeAnimationId, { bgConfig: newBgConfig });
       }
     } catch (e) {
       console.error(e);
@@ -257,7 +350,7 @@ const App: React.FC = () => {
           const exportData: any = { meta: { generatedBy: "SpriteForge" }, animations: {} };
           for (const anim of animations) {
               if (anim.layers.length === 0 && !anim.imageSrc) continue;
-              const frames = await sliceFrames(anim.layers, anim.spriteConfig, anim.bgConfig);
+              const frames = await sliceFrames(anim.layers, anim.bgConfig);
               const animFrames = anim.frames.map(i => frames[i]).filter(Boolean);
               if (animFrames.length === 0) continue;
               const blob = await stitchFrames(animFrames);
@@ -270,8 +363,6 @@ const App: React.FC = () => {
               exportData.animations[anim.name] = {
                   fps: anim.animConfig.fps,
                   loop: anim.animConfig.loop,
-                  frameWidth: anim.spriteConfig.width,
-                  frameHeight: anim.spriteConfig.height,
                   totalFrames: animFrames.length,
                   image: base64
               };
@@ -313,11 +404,17 @@ const App: React.FC = () => {
       
       <Header 
         currentAnimId={activeAnimationId}
-        showCrosshair={currentAnim?.spriteConfig.showCrosshair || false}
-        onToggleCrosshair={() => currentAnim && updateEntry(currentAnim.id, { spriteConfig: { ...currentAnim.spriteConfig, showCrosshair: !currentAnim.spriteConfig.showCrosshair } })}
+        showCrosshair={activeLayerId ? currentAnim?.layers.find(l => l.id === activeLayerId)?.spriteConfig.showCrosshair || false : false}
+        onToggleCrosshair={() => {
+            if (activeLayerId) {
+                const layer = currentAnim?.layers.find(l => l.id === activeLayerId);
+                if (layer) updateLayer(activeLayerId, { spriteConfig: { ...layer.spriteConfig, showCrosshair: !layer.spriteConfig.showCrosshair } });
+            }
+        }}
         onNewProject={handleNewProject}
         toolMode={toolMode}
         onToolModeChange={setToolMode}
+        onAddFrame={() => handleAddFrame(false)}
       />
 
       <div className="flex-1 flex overflow-hidden relative">
@@ -326,17 +423,24 @@ const App: React.FC = () => {
             isProcessing={isProcessing}
             animations={animations}
             activeAnimationId={activeAnimationId}
-            onSelectAnim={(id) => { setActiveAnimationId(id); setSelectedFrameIndex(null); }}
+            onSelectAnim={(id) => { 
+                setActiveAnimationId(id); 
+                // Auto select first layer if available
+                const anim = animations.find(a => a.id === id);
+                if (anim && anim.layers.length > 0) setActiveLayerId(anim.layers[0].id);
+                else setActiveLayerId(null);
+                setSelectedFrameIndex(null); 
+            }}
             onRenameAnim={(id, name) => updateEntry(id, { name })}
             onAddAnim={() => {
                 const id = `anim_${Date.now()}`;
                 setAnimations(prev => [...prev, {
                     id, name: 'New Anim', imageSrc: null, layers: [],
-                    spriteConfig: { ...DEFAULT_SPRITE_CONFIG, frameOffsets: {} },
                     bgConfig: { ...DEFAULT_BG_CONFIG, colors: [{ color: '#00ff00', tolerance: 10 }] },
                     animConfig: { ...DEFAULT_ANIM_CONFIG }, frames: []
                 }]);
                 setActiveAnimationId(id);
+                setActiveLayerId(null);
                 setSelectedFrameIndex(null);
             }}
             onRemoveAnim={(id) => {
@@ -346,12 +450,17 @@ const App: React.FC = () => {
                 if(activeAnimationId === id) setActiveAnimationId(newAnims[0].id);
             }}
             currentAnim={currentAnim}
-            onDetect={handleMagicDetect}
+            
+            // Layer Props
+            activeLayerId={activeLayerId}
+            onSelectLayer={setActiveLayerId}
             onImportFile={handleFileLoad}
             onUpdateLayers={(layers) => currentAnim && updateEntry(currentAnim.id, { layers })}
             onRemoveLayer={(layerId) => currentAnim && updateEntry(currentAnim.id, { layers: currentAnim.layers.filter(l => l.id !== layerId) })}
+            onUpdateLayer={updateLayer}
+
+            onDetect={handleMagicDetect}
             selectedFrameIndex={selectedFrameIndex}
-            onUpdateSpriteConfig={(cfg) => currentAnim && updateEntry(currentAnim.id, { spriteConfig: cfg })}
             onUpdateGrid={updateGrid}
             onUpdateBgConfig={(cfg) => currentAnim && updateEntry(currentAnim.id, { bgConfig: cfg })}
             onExport={handleExport}
@@ -365,9 +474,10 @@ const App: React.FC = () => {
                     <SpriteEditor 
                         entry={currentAnim}
                         activeAnimationId={activeAnimationId}
+                        activeLayerId={activeLayerId}
                         selectedFrameIndex={selectedFrameIndex}
-                        onConfigChange={(newConfig) => updateEntry(currentAnim.id, { spriteConfig: newConfig })}
                         onEntryUpdate={(updates) => updateEntry(currentAnim.id, updates)}
+                        onLayerUpdate={updateLayer}
                         onFrameSelect={setSelectedFrameIndex}
                         toolMode={toolMode}
                     />
@@ -394,13 +504,7 @@ const App: React.FC = () => {
                         onUpdateFrames={(frames) => updateEntry(currentAnim.id, { frames })}
                         selectedFrameIndex={selectedTimelineIndex}
                         onSelectTimelineFrame={setSelectedTimelineIndex}
-                        onAddNewFrame={() => {
-                            const newTotal = currentAnim.spriteConfig.totalFrames + 1;
-                            const newIndex = newTotal - 1;
-                            const newOffsets = { ...currentAnim.spriteConfig.frameOffsets, [newIndex]: { x: 0, y: 0, w: 32, h: 32 } };
-                            updateEntry(currentAnim.id, { spriteConfig: { ...currentAnim.spriteConfig, totalFrames: newTotal, frameOffsets: newOffsets }, frames: [...currentAnim.frames, newIndex] });
-                            setSelectedFrameIndex(newIndex);
-                        }}
+                        onAddNewFrame={() => handleAddFrame(true)}
                     />
                 )}
             </div>

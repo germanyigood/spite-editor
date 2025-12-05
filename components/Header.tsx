@@ -1,5 +1,6 @@
+
 import React from 'react';
-import { Layers, Crosshair, Trash2, MousePointer2, Move } from 'lucide-react';
+import { Layers, Crosshair, Trash2, MousePointer2, Move, PlusSquare } from 'lucide-react';
 import { SpriteConfig } from '../types';
 
 interface HeaderProps {
@@ -9,6 +10,7 @@ interface HeaderProps {
   onNewProject: () => void;
   toolMode: 'select' | 'move_layer';
   onToolModeChange: (mode: 'select' | 'move_layer') => void;
+  onAddFrame: () => void;
 }
 
 const Header: React.FC<HeaderProps> = ({
@@ -17,7 +19,8 @@ const Header: React.FC<HeaderProps> = ({
   onToggleCrosshair,
   onNewProject,
   toolMode,
-  onToolModeChange
+  onToolModeChange,
+  onAddFrame
 }) => {
   return (
     <header className="h-14 bg-gray-900 border-b border-gray-800 flex items-center justify-between px-6 shrink-0 z-20">
@@ -42,6 +45,16 @@ const Header: React.FC<HeaderProps> = ({
                  title="Move Source Images"
                >
                   <Move size={14} /> Move Layer
+               </button>
+               
+               <div className="w-px h-4 bg-gray-700 mx-1" />
+               
+               <button 
+                 onClick={onAddFrame}
+                 className="p-1.5 rounded text-xs flex items-center gap-1 transition-colors text-gray-300 hover:text-white hover:bg-gray-700"
+                 title="Create new empty frame on active layer"
+               >
+                  <PlusSquare size={14} /> Add Frame
                </button>
           </div>
       )}

@@ -1,3 +1,4 @@
+
 import React from 'react';
 import MagicDetectPanel from './panels/MagicDetectPanel';
 import AnimationListPanel from './panels/AnimationListPanel';
@@ -22,15 +23,20 @@ interface LeftSidebarProps {
   // Current Animation Props
   currentAnim: AnimationEntry | undefined;
   
+  // Layer Props
+  activeLayerId: string | null;
+  onSelectLayer: (id: string) => void;
+  
   // Handlers
   onDetect: () => void;
   onImportFile: (file: File) => void;
   onUpdateLayers: (layers: SourceLayer[]) => void;
   onRemoveLayer: (id: string) => void;
+  onUpdateLayer: (id: string, updates: Partial<SourceLayer>) => void;
   
   // Configs
   selectedFrameIndex: number | null;
-  onUpdateSpriteConfig: (cfg: SpriteConfig) => void;
+  // onUpdateSpriteConfig: (cfg: SpriteConfig) => void; // Deprecated, use onUpdateLayer
   onUpdateGrid: (key: keyof SpriteConfig, value: number) => void;
   onUpdateBgConfig: (cfg: BackgroundRemovalConfig) => void;
 
@@ -48,12 +54,14 @@ const LeftSidebar: React.FC<LeftSidebarProps> = ({
   onAddAnim,
   onRemoveAnim,
   currentAnim,
+  activeLayerId,
+  onSelectLayer,
   onDetect,
   onImportFile,
   onUpdateLayers,
   onRemoveLayer,
+  onUpdateLayer,
   selectedFrameIndex,
-  onUpdateSpriteConfig,
   onUpdateGrid,
   onUpdateBgConfig,
   onExport,
@@ -61,6 +69,10 @@ const LeftSidebar: React.FC<LeftSidebarProps> = ({
 }) => {
   
   const hasLayers = (currentAnim?.layers.length || 0) > 0;
+  
+  // Determine active config based on selected layer
+  const activeLayer = currentAnim?.layers.find(l => l.id === activeLayerId);
+  const activeSpriteConfig = activeLayer?.spriteConfig;
 
   return (
     <aside className="w-80 bg-gray-900 border-r border-gray-800 flex flex-col overflow-y-auto shrink-0 custom-scrollbar z-10 pb-10">
@@ -68,7 +80,7 @@ const LeftSidebar: React.FC<LeftSidebarProps> = ({
         
         <MagicDetectPanel 
             isProcessing={isProcessing} 
-            disabled={!hasLayers} 
+            disabled={!hasLayers || !activeLayerId} 
             onDetect={onDetect} 
         />
 
@@ -83,32 +95,40 @@ const LeftSidebar: React.FC<LeftSidebarProps> = ({
 
         <LayerListPanel 
             layers={currentAnim?.layers || []}
+            activeLayerId={activeLayerId}
+            onSelectLayer={onSelectLayer}
             onImportFile={onImportFile}
             onRemoveLayer={onRemoveLayer}
         />
         
         <hr className="border-gray-800" />
 
-        {hasLayers ? (
+        {activeLayer && activeSpriteConfig ? (
             <>
+                <div className="text-xs text-cyan-500 font-semibold uppercase px-2 mb-2">
+                    Editing: {activeLayer.name}
+                </div>
                 <SpriteConfigPanel 
-                    config={currentAnim!.spriteConfig}
+                    config={activeSpriteConfig}
                     selectedFrameIndex={selectedFrameIndex}
-                    onUpdateConfig={onUpdateSpriteConfig}
+                    onUpdateConfig={(newConfig) => onUpdateLayer(activeLayer.id, { spriteConfig: newConfig })}
                     onUpdateGrid={onUpdateGrid}
                 />
-                
+            </>
+        ) : (
+            <div className="p-4 text-center text-gray-500 text-sm border border-dashed border-gray-800 rounded-xl bg-gray-900/50">
+                <p>{hasLayers ? "Select a layer to edit grid." : "No images loaded."}</p>
+            </div>
+        )}
+        
+        {hasLayers && (
+            <>
                 <hr className="border-gray-800" />
-
                 <BackgroundConfigPanel 
                     config={currentAnim!.bgConfig}
                     onUpdateConfig={onUpdateBgConfig}
                 />
             </>
-        ) : (
-            <div className="p-4 text-center text-gray-500 text-sm border border-dashed border-gray-800 rounded-xl bg-gray-900/50">
-                <p>No images loaded.</p>
-            </div>
         )}
         
         <hr className="border-gray-800" />

@@ -50,15 +50,16 @@ export interface SourceLayer {
   opacity: number;
   visible: boolean;
   name: string;
+  // Each layer now has its own grid configuration
+  spriteConfig: SpriteConfig; 
 }
 
 export interface AnimationEntry {
   id: string;
   name: string;
-  // imageSrc is deprecated in favor of layers, but kept for migration if needed
+  // imageSrc is deprecated in favor of layers
   imageSrc: string | null; 
   layers: SourceLayer[]; // Support multiple source images
-  spriteConfig: SpriteConfig;
   bgConfig: BackgroundRemovalConfig;
   animConfig: AnimationConfig;
   frames: number[]; // Sequence of frame indices to play (Timeline)

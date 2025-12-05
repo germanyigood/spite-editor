@@ -28,13 +28,12 @@ export interface AnimationConfig {
 
 export interface BackgroundRemovalConfig {
   enabled: boolean;
-  colors: Array<{ color: string, tolerance: number }>; // Updated for per-color tolerance
-  tolerance: number; // Deprecated, kept for type compatibility during migration if needed, but logic moves to colors array
-  // Advanced Edge Settings
-  edgeRadius: number; // 0-10px (Spatial distance)
-  edgeOpacity: number; // 0-100% (How transparent the edge becomes)
-  edgeTint: string; // Hex color to blend edges into (e.g. #000000 to darken halos)
-  edgeTintIntensity: number; // 0-100%
+  colors: Array<{ color: string, tolerance: number }>;
+  tolerance: number; 
+  edgeRadius: number; 
+  edgeOpacity: number; 
+  edgeTint: string; 
+  edgeTintIntensity: number; 
 }
 
 export interface DetectedLayout {
@@ -43,12 +42,24 @@ export interface DetectedLayout {
   backgroundColor?: string;
 }
 
+export interface SourceLayer {
+  id: string;
+  imageSrc: string;
+  x: number;
+  y: number;
+  opacity: number;
+  visible: boolean;
+  name: string;
+}
+
 export interface AnimationEntry {
   id: string;
   name: string;
-  imageSrc: string | null;
+  // imageSrc is deprecated in favor of layers, but kept for migration if needed
+  imageSrc: string | null; 
+  layers: SourceLayer[]; // Support multiple source images
   spriteConfig: SpriteConfig;
   bgConfig: BackgroundRemovalConfig;
   animConfig: AnimationConfig;
-  frames: number[]; // Sequence of frame indices to play
+  frames: number[]; // Sequence of frame indices to play (Timeline)
 }

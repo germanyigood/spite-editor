@@ -1,5 +1,5 @@
 
-import { BackgroundRemovalConfig, SpriteConfig, AnimationConfig, AnimationEntry } from "./types";
+import { BackgroundRemovalConfig, SpriteConfig, AnimationConfig, AnimationEntry, SourceLayer } from "./types";
 import JSZip from 'jszip';
 
 // Convert Hex to RGB
@@ -24,12 +24,58 @@ const getColorDistance = (
   );
 };
 
-export const sliceFrames = (
-  image: HTMLImageElement,
+export const sliceFrames = async (
+  layers: SourceLayer[],
   config: SpriteConfig,
   bgConfig: BackgroundRemovalConfig
-): string[] => {
+): Promise<string[]> => {
   const frames: string[] = [];
+
+  // 1. Create a Master Canvas that composites all layers
+  const loadedImages = await Promise.all(layers.map(layer => {
+      return new Promise<{img: HTMLImageElement, layer: SourceLayer}>((resolve, reject) => {
+          const img = new Image();
+          img.onload = () => resolve({ img, layer });
+          img.onerror = reject;
+          img.src = layer.imageSrc;
+      });
+  }));
+
+  // Determine needed size (Grid area + Layer areas)
+  let maxX = 0; 
+  let maxY = 0;
+
+  // Check Grid Extents
+  const gridW = config.offsetX + (config.cols * (config.width + config.margin));
+  const gridH = config.offsetY + (config.rows * (config.height + config.margin));
+  maxX = Math.max(maxX, gridW);
+  maxY = Math.max(maxY, gridH);
+
+  // Check Layer Extents
+  loadedImages.forEach(({img, layer}) => {
+      maxX = Math.max(maxX, layer.x + img.naturalWidth);
+      maxY = Math.max(maxY, layer.y + img.naturalHeight);
+  });
+  
+  // Buffer for manual frames that might be outside
+  maxX += 4000; 
+  maxY += 4000;
+
+  const masterCanvas = document.createElement('canvas');
+  masterCanvas.width = maxX;
+  masterCanvas.height = maxY;
+  const masterCtx = masterCanvas.getContext('2d', { willReadFrequently: true });
+  if (!masterCtx) return [];
+
+  // Draw Layers
+  loadedImages.forEach(({img, layer}) => {
+      if (!layer.visible) return;
+      masterCtx.globalAlpha = layer.opacity;
+      masterCtx.drawImage(img, layer.x, layer.y);
+  });
+  masterCtx.globalAlpha = 1.0;
+
+  // 2. Slice from Master Canvas
   
   // Pre-calculate RGB values for all target colors
   const targetColors = bgConfig.colors.map(c => ({
@@ -42,20 +88,28 @@ export const sliceFrames = (
   const edgeOpacityFactor = bgConfig.edgeOpacity / 100;
   const tintIntensity = bgConfig.edgeTintIntensity / 100;
 
-  for (let r = 0; r < config.rows; r++) {
-    for (let c = 0; c < config.cols; c++) {
-      if (frames.length >= config.totalFrames) break;
-
-      const frameIndex = frames.length; // Current linear index
-      const offset = config.frameOffsets[frameIndex] || { x: 0, y: 0 };
-
-      // Determine Frame Dimensions (Default or Overridden)
+  // Iterate up to totalFrames, allowing for manual frames outside grid logic
+  for (let i = 0; i < config.totalFrames; i++) {
+      const offset = config.frameOffsets[i] || { x: 0, y: 0 };
       const frameW = offset.w !== undefined ? offset.w : config.width;
       const frameH = offset.h !== undefined ? offset.h : config.height;
 
-      // Base calculated position
-      let sx = config.offsetX + c * (config.width + config.margin);
-      let sy = config.offsetY + r * (config.height + config.margin);
+      // Base calculated position (if within grid bounds)
+      let sx = 0;
+      let sy = 0;
+      
+      const gridLimit = config.rows * config.cols;
+      
+      if (i < gridLimit) {
+          const r = Math.floor(i / config.cols);
+          const c = i % config.cols;
+          sx = config.offsetX + c * (config.width + config.margin);
+          sy = config.offsetY + r * (config.height + config.margin);
+      } else {
+          // Manual frames default to 0,0 base, relying entirely on offsets
+          sx = 0; 
+          sy = 0;
+      }
 
       // Apply individual frame offset
       sx += offset.x;
@@ -69,9 +123,9 @@ export const sliceFrames = (
 
       if (!ctx) continue;
 
-      // Draw slice (1:1 copy from source to dest)
+      // Draw slice from MASTER
       ctx.drawImage(
-        image,
+        masterCanvas,
         sx, sy, frameW, frameH, // Source
         0, 0, frameW, frameH    // Destination
       );
@@ -86,12 +140,12 @@ export const sliceFrames = (
         // Pass 1: Identification
         const isBackground = new Uint8Array(width * height);
         
-        for (let i = 0; i < data.length; i += 4) {
-          const pxIndex = i / 4;
-          const r = data[i];
-          const g = data[i + 1];
-          const b = data[i + 2];
-          const a = data[i + 3];
+        for (let idx = 0; idx < data.length; idx += 4) {
+          const pxIndex = idx / 4;
+          const r = data[idx];
+          const g = data[idx + 1];
+          const b = data[idx + 2];
+          const a = data[idx + 3];
 
           if (a === 0) {
             isBackground[pxIndex] = 1;
@@ -99,7 +153,6 @@ export const sliceFrames = (
           }
 
           let isMatch = false;
-          // Check against all configured colors with their specific tolerances
           for (const target of targetColors) {
             const dist = getColorDistance(r, g, b, target.rgb.r, target.rgb.g, target.rgb.b);
             if (dist <= target.toleranceThreshold) {
@@ -110,7 +163,7 @@ export const sliceFrames = (
 
           if (isMatch) {
             isBackground[pxIndex] = 1;
-            data[i + 3] = 0; // Immediate removal
+            data[idx + 3] = 0; // Immediate removal
           } else {
             isBackground[pxIndex] = 0;
           }
@@ -121,16 +174,12 @@ export const sliceFrames = (
           for (let y = 0; y < height; y++) {
             for (let x = 0; x < width; x++) {
               const pxIndex = y * width + x;
-              
               if (isBackground[pxIndex]) continue;
 
-              // Foreground: check distance to nearest bg
               let minBgDist = radius + 1;
-              
               for (let ky = -radius; ky <= radius; ky++) {
                 const ny = y + ky;
                 if (ny < 0 || ny >= height) continue;
-                
                 for (let kx = -radius; kx <= radius; kx++) {
                   const nx = x + kx;
                   if (nx < 0 || nx >= width) continue;
@@ -138,32 +187,22 @@ export const sliceFrames = (
                   const nIndex = ny * width + nx;
                   if (isBackground[nIndex]) {
                     const dist = Math.sqrt(kx*kx + ky*ky);
-                    if (dist < minBgDist) {
-                      minBgDist = dist;
-                    }
+                    if (dist < minBgDist) minBgDist = dist;
                   }
                 }
               }
 
-              // It is an edge pixel
               if (minBgDist <= radius) {
                 const alphaIndex = pxIndex * 4 + 3;
-                
-                // Normalized distance factor (0 = at edge, 1 = safe inside)
                 const effectStrength = 1 - (minBgDist / radius);
-                
-                // 1. Edge Opacity
                 const alphaMod = 1 - (effectStrength * (1 - edgeOpacityFactor));
                 data[alphaIndex] = Math.floor(data[alphaIndex] * alphaMod);
 
-                // 2. Edge Tint (Green suppression)
                 if (tintIntensity > 0) {
                   const rIdx = pxIndex * 4;
                   const gIdx = pxIndex * 4 + 1;
                   const bIdx = pxIndex * 4 + 2;
-
-                  const mix = tintIntensity * effectStrength; // How much to tint
-
+                  const mix = tintIntensity * effectStrength; 
                   data[rIdx] = data[rIdx] * (1 - mix) + tintColor.r * mix;
                   data[gIdx] = data[gIdx] * (1 - mix) + tintColor.g * mix;
                   data[bIdx] = data[bIdx] * (1 - mix) + tintColor.b * mix;
@@ -172,20 +211,17 @@ export const sliceFrames = (
             }
           }
         }
-        
         ctx.putImageData(imageData, 0, 0);
       }
 
       frames.push(canvas.toDataURL('image/png'));
-    }
   }
 
   return frames;
 };
 
 // Stitch frames into a single strip for export
-// Supports variable frame widths
-export const stitchFrames = async (frames: string[], defaultWidth: number, defaultHeight: number): Promise<Blob | null> => {
+export const stitchFrames = async (frames: string[]): Promise<Blob | null> => {
   if (frames.length === 0) return null;
 
   const loadImg = (src: string): Promise<HTMLImageElement> => {
@@ -198,7 +234,6 @@ export const stitchFrames = async (frames: string[], defaultWidth: number, defau
 
   const images = await Promise.all(frames.map(loadImg));
   
-  // Calculate total dimensions
   let totalWidth = 0;
   let maxHeight = 0;
   
@@ -216,12 +251,52 @@ export const stitchFrames = async (frames: string[], defaultWidth: number, defau
 
   let currentX = 0;
   for (const img of images) {
-    // Center vertically if heights differ? Or align bottom? Align top for now.
     ctx.drawImage(img, currentX, 0);
     currentX += img.naturalWidth;
   }
 
   return new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+};
+
+// Helper to generate sprite sheet metadata for export
+export const generateSpriteSheetData = async (frames: string[], animName: string) => {
+    const loadImg = (src: string): Promise<HTMLImageElement> => {
+        return new Promise((resolve) => {
+          const img = new Image();
+          img.onload = () => resolve(img);
+          img.src = src;
+        });
+    };
+    
+    const images = await Promise.all(frames.map(loadImg));
+    
+    let currentX = 0;
+    let maxHeight = 0;
+    const spriteFrames = [];
+
+    for (let i = 0; i < images.length; i++) {
+        const img = images[i];
+        spriteFrames.push({
+            name: `${animName}_${i}`,
+            frame: { x: currentX, y: 0, w: img.naturalWidth, h: img.naturalHeight },
+            sourceSize: { w: img.naturalWidth, h: img.naturalHeight },
+            spriteSourceSize: { x: 0, y: 0, w: img.naturalWidth, h: img.naturalHeight }
+        });
+        currentX += img.naturalWidth;
+        maxHeight = Math.max(maxHeight, img.naturalHeight);
+    }
+
+    return {
+        frames: spriteFrames,
+        meta: {
+            app: "SpriteForge AI",
+            version: "1.0",
+            image: `${animName}.png`,
+            format: "RGBA8888",
+            size: { w: currentX, h: maxHeight },
+            scale: "1"
+        }
+    };
 };
 
 // --- Project Import/Export ---
@@ -231,22 +306,41 @@ export const createProjectBundle = async (animations: AnimationEntry[]): Promise
   const metaAnimations: any[] = [];
 
   for (const anim of animations) {
-    let imgRef = null;
-    if (anim.imageSrc) {
-      const base64Data = anim.imageSrc.split(',')[1];
-      const fileName = `assets/${anim.id}.png`;
-      zip.file(fileName, base64Data, { base64: true });
-      imgRef = fileName;
+    // Process layers for this animation
+    const processedLayers = [];
+    
+    if (!anim.layers || anim.layers.length === 0) {
+        if (anim.imageSrc) {
+            const base64Data = anim.imageSrc.split(',')[1];
+            const fileName = `assets/${anim.id}_main.png`;
+            zip.file(fileName, base64Data, { base64: true });
+            processedLayers.push({
+                id: 'legacy_layer',
+                imageSrc: fileName,
+                x: 0, y: 0, opacity: 1, visible: true, name: 'Main'
+            });
+        }
+    } else {
+        for (const layer of anim.layers) {
+            const base64Data = layer.imageSrc.split(',')[1];
+            const fileName = `assets/${anim.id}_${layer.id}.png`;
+            zip.file(fileName, base64Data, { base64: true });
+            processedLayers.push({
+                ...layer,
+                imageSrc: fileName
+            });
+        }
     }
 
     metaAnimations.push({
       ...anim,
-      imageSrc: imgRef 
+      layers: processedLayers,
+      imageSrc: null // Clear legacy field in export
     });
   }
 
   const meta = {
-      version: 2,
+      version: 3,
       animations: metaAnimations
   };
   zip.file("project.json", JSON.stringify(meta, null, 2));
@@ -264,7 +358,18 @@ export const loadProjectBundle = async (file: File): Promise<AnimationEntry[]> =
   const metaText = await metaFile.async("string");
   const meta = JSON.parse(metaText);
 
-  // Helper to migrate V1 bgConfig (string array) to V2 (object array)
+  // Helper to migrate V1/V2 to V3 layers
+  const resolveImage = async (pathOrUrl: string) => {
+      if (!pathOrUrl) return null;
+      if (pathOrUrl.startsWith('data:')) return pathOrUrl;
+      const f = loadedZip.file(pathOrUrl);
+      if (f) {
+          const b64 = await f.async("base64");
+          return `data:image/png;base64,${b64}`;
+      }
+      return null;
+  };
+
   const migrateBgConfig = (bgConfig: any) => {
     if (!bgConfig) return bgConfig;
     if (Array.isArray(bgConfig.colors) && bgConfig.colors.length > 0 && typeof bgConfig.colors[0] === 'string') {
@@ -277,50 +382,68 @@ export const loadProjectBundle = async (file: File): Promise<AnimationEntry[]> =
     return bgConfig;
   };
 
-  // --- Version 1: Legacy Import ---
+  const processAnimationImport = async (animMeta: any): Promise<AnimationEntry> => {
+       const layers: SourceLayer[] = [];
+       
+       if (animMeta.layers && Array.isArray(animMeta.layers)) {
+           for (const l of animMeta.layers) {
+               const src = await resolveImage(l.imageSrc);
+               if (src) {
+                   layers.push({ ...l, imageSrc: src });
+               }
+           }
+       } else if (animMeta.imageSrc) {
+           const src = await resolveImage(animMeta.imageSrc);
+           if (src) {
+               layers.push({
+                   id: 'imported_layer',
+                   name: 'Main Image',
+                   imageSrc: src,
+                   x: 0, y: 0, opacity: 1, visible: true
+               });
+           }
+       }
+
+       return {
+           ...animMeta,
+           bgConfig: migrateBgConfig(animMeta.bgConfig),
+           layers,
+           imageSrc: layers.length > 0 ? layers[0].imageSrc : null
+       };
+  };
+
   if (meta.version === 1 || !meta.animations) {
     const imgFile = loadedZip.file("source.png");
     let imageSrc = null;
+    const layers: SourceLayer[] = [];
+
     if (imgFile) {
         const imgBase64 = await imgFile.async("base64");
         imageSrc = `data:image/png;base64,${imgBase64}`;
+        layers.push({
+            id: 'legacy', name: 'Layer 1', imageSrc, x: 0, y: 0, opacity: 1, visible: true
+        });
     }
 
     const totalFrames = meta.spriteConfig.totalFrames || (meta.spriteConfig.rows * meta.spriteConfig.cols) || 1;
     const defaultFrames = Array.from({length: totalFrames}, (_, i) => i);
 
-    const legacyEntry: AnimationEntry = {
+    return [{
         id: 'imported_legacy',
         name: 'Imported Project',
         imageSrc,
+        layers,
         spriteConfig: meta.spriteConfig,
         bgConfig: migrateBgConfig(meta.bgConfig),
         animConfig: meta.animConfig,
         frames: meta.frames || defaultFrames
-    };
-
-    return [legacyEntry];
+    }];
   }
 
-  // --- Version 2: Multi-Animation Import ---
-  if (meta.version === 2 && Array.isArray(meta.animations)) {
+  if ((meta.version === 2 || meta.version === 3) && Array.isArray(meta.animations)) {
      const entries: AnimationEntry[] = [];
-     
      for (const animMeta of meta.animations) {
-         let imageSrc = null;
-         if (animMeta.imageSrc) {
-             const imgFile = loadedZip.file(animMeta.imageSrc);
-             if (imgFile) {
-                 const b64 = await imgFile.async("base64");
-                 imageSrc = `data:image/png;base64,${b64}`;
-             }
-         }
-
-         entries.push({
-             ...animMeta,
-             bgConfig: migrateBgConfig(animMeta.bgConfig),
-             imageSrc
-         });
+         entries.push(await processAnimationImport(animMeta));
      }
      return entries;
   }

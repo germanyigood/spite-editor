@@ -1,15 +1,16 @@
 
 import React, { useRef, useEffect, useState } from 'react';
-import { SpriteConfig, AnimationEntry } from '../types';
-import { Crosshair, Eye, EyeOff } from 'lucide-react';
+import { SpriteConfig, AnimationEntry, SourceLayer } from '../types';
+import { Crosshair, Eye, EyeOff, Move, MousePointer2 } from 'lucide-react';
 
 interface SpriteEditorProps {
   entry: AnimationEntry;
   activeAnimationId: string;
-  selectedFrameIndex: number | null;
+  selectedFrameIndex: number | null; // This is the GRID index (source frame)
   onConfigChange: (newConfig: SpriteConfig) => void;
   onEntryUpdate: (updates: Partial<AnimationEntry>) => void;
   onFrameSelect: (index: number | null) => void;
+  toolMode: 'select' | 'move_layer';
 }
 
 const SpriteEditor: React.FC<SpriteEditorProps> = ({ 
@@ -18,11 +19,11 @@ const SpriteEditor: React.FC<SpriteEditorProps> = ({
   selectedFrameIndex,
   onConfigChange,
   onEntryUpdate,
-  onFrameSelect
+  onFrameSelect,
+  toolMode
 }) => {
-  const { imageSrc, spriteConfig: config, frames: activeFrames } = entry;
+  const { layers, spriteConfig: config, frames: activeTimelineFrames } = entry;
   const containerRef = useRef<HTMLDivElement>(null);
-  const [imgDimensions, setImgDimensions] = useState({ w: 0, h: 0 });
   
   // Transform State (Pan/Zoom)
   const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 });
@@ -31,26 +32,20 @@ const SpriteEditor: React.FC<SpriteEditorProps> = ({
   const [isPanning, setIsPanning] = useState(false);
   const [draggedFrame, setDraggedFrame] = useState<number | null>(null);
   const [resizingFrame, setResizingFrame] = useState<{index: number, handle: string} | null>(null);
+  
+  // Layer Dragging
+  const [draggedLayerId, setDraggedLayerId] = useState<string | null>(null);
 
   const lastMousePos = useRef({ x: 0, y: 0 });
   const isSpacePressed = useRef(false);
 
+  // Center canvas on first load if we have content
   useEffect(() => {
-    if (!imageSrc) return;
-    const img = new Image();
-    img.src = imageSrc;
-    img.onload = () => {
-      setImgDimensions({ w: img.naturalWidth, h: img.naturalHeight });
-      if (containerRef.current) {
-        const { clientWidth, clientHeight } = containerRef.current;
-        setTransform({
-          x: (clientWidth - img.naturalWidth) / 2,
-          y: (clientHeight - img.naturalHeight) / 2,
-          scale: 1
-        });
-      }
-    };
-  }, [imageSrc]);
+    if (layers.length > 0 && containerRef.current) {
+        // Only if not already moved? For now, we leave it or user adjusts. 
+        // Initial centering could be calculated based on first layer size.
+    }
+  }, [activeAnimationId]);
 
   // Track space key for panning
   useEffect(() => {
@@ -101,30 +96,63 @@ const SpriteEditor: React.FC<SpriteEditorProps> = ({
       return;
     }
 
-    // Check if clicking a Resize Handle
-    const target = e.target as HTMLElement;
-    if (target.dataset.resizeHandle && selectedFrameIndex !== null) {
-      setResizingFrame({ index: selectedFrameIndex, handle: target.dataset.resizeHandle });
-      e.stopPropagation();
-      return;
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+    const imgX = (mouseX - transform.x) / transform.scale;
+    const imgY = (mouseY - transform.y) / transform.scale;
+
+
+    // --- TOOL: MOVE LAYER ---
+    if (toolMode === 'move_layer' && e.button === 0) {
+        // Find clicked layer (reverse order to hit top first)
+        // Since layers are just drawn, we need to check bounding boxes.
+        // NOTE: We don't have natural dims here easily without ref to DOM elements. 
+        // We rely on the DOM rendered images for hit testing? 
+        // Actually, we can check the layer list if we knew dimensions. 
+        // Simpler approach: Check DOM elements.
+        const layerElements = document.querySelectorAll(`[data-layer-id]`);
+        let hitLayerId: string | null = null;
+        
+        // Reverse iteration to find top-most
+        for (let i = layerElements.length - 1; i >= 0; i--) {
+            const el = layerElements[i] as HTMLElement;
+            const lid = el.dataset.layerId;
+            const lx = parseFloat(el.dataset.x || '0');
+            const ly = parseFloat(el.dataset.y || '0');
+            const lw = parseFloat(el.dataset.w || '0');
+            const lh = parseFloat(el.dataset.h || '0');
+            
+            if (imgX >= lx && imgX <= lx + lw && imgY >= ly && imgY <= ly + lh) {
+                hitLayerId = lid || null;
+                break;
+            }
+        }
+        
+        if (hitLayerId) {
+            setDraggedLayerId(hitLayerId);
+            return;
+        }
     }
 
-    // Left Click = Try to drag a frame or Select it
-    if (e.button === 0) {
-      const rect = containerRef.current?.getBoundingClientRect();
-      if (!rect) return;
 
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
+    // --- TOOL: SELECT FRAME ---
+    if (toolMode === 'select') {
+        // Check if clicking a Resize Handle
+        const target = e.target as HTMLElement;
+        if (target.dataset.resizeHandle && selectedFrameIndex !== null) {
+        setResizingFrame({ index: selectedFrameIndex, handle: target.dataset.resizeHandle });
+        e.stopPropagation();
+        return;
+        }
 
-      const imgX = (mouseX - transform.x) / transform.scale;
-      const imgY = (mouseY - transform.y) / transform.scale;
+        // Check Frame Hit
+        if (e.button === 0) {
+        let clickedFrameIndex: number | null = null;
 
-      let clickedFrameIndex: number | null = null;
-
-      if (imageSrc) {
         for (let r = 0; r < config.rows; r++) {
-          for (let c = 0; c < config.cols; c++) {
+            for (let c = 0; c < config.cols; c++) {
             const idx = r * config.cols + c;
             if (idx >= config.totalFrames) continue;
 
@@ -140,17 +168,17 @@ const SpriteEditor: React.FC<SpriteEditorProps> = ({
 
             if (imgX >= curX && imgX < curX + fW && 
                 imgY >= curY && imgY < curY + fH) {
-              
-              clickedFrameIndex = idx;
-              setDraggedFrame(idx);
-              break;
+                
+                clickedFrameIndex = idx;
+                setDraggedFrame(idx);
+                break;
             }
-          }
-          if (clickedFrameIndex !== null) break;
+            }
+            if (clickedFrameIndex !== null) break;
         }
-      }
 
-      onFrameSelect(clickedFrameIndex);
+        onFrameSelect(clickedFrameIndex);
+        }
     }
   };
 
@@ -165,6 +193,15 @@ const SpriteEditor: React.FC<SpriteEditorProps> = ({
     if (isPanning) {
       setTransform(prev => ({ ...prev, x: prev.x + dx, y: prev.y + dy }));
     } 
+    else if (draggedLayerId) {
+        const newLayers = layers.map(l => {
+            if (l.id === draggedLayerId) {
+                return { ...l, x: l.x + imgDx, y: l.y + imgDy };
+            }
+            return l;
+        });
+        onEntryUpdate({ layers: newLayers });
+    }
     else if (resizingFrame) {
       const idx = resizingFrame.index;
       const currentOffset = config.frameOffsets[idx] || { x: 0, y: 0 };
@@ -231,31 +268,28 @@ const SpriteEditor: React.FC<SpriteEditorProps> = ({
     setIsPanning(false);
     setDraggedFrame(null);
     setResizingFrame(null);
+    setDraggedLayerId(null);
   };
 
   const handleFrameToggle = (index: number, e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault(); 
     
-    // Toggle frame in current animation
-    let newFrames = [...activeFrames];
-    const framePositionInAnim = newFrames.indexOf(index);
-
-    if (framePositionInAnim >= 0) {
-      newFrames.splice(framePositionInAnim, 1);
+    // Toggle frame in current animation sequence
+    // If it's already in the timeline, remove ALL instances? Or just add to end?
+    // Convention: Eye icon adds to end if not present, removes all if present.
+    let newFrames = [...activeTimelineFrames];
+    if (newFrames.includes(index)) {
+        newFrames = newFrames.filter(i => i !== index);
     } else {
-      newFrames.push(index);
-      newFrames.sort((a,b) => a - b); 
+        newFrames.push(index);
     }
-
     onEntryUpdate({ frames: newFrames });
   };
 
 
   // Visual Grid Overlay
   const renderGrid = () => {
-    if (!imgDimensions.w || !imageSrc) return null;
-
     const gridElements = [];
     
     for (let r = 0; r < config.rows; r++) {
@@ -274,11 +308,11 @@ const SpriteEditor: React.FC<SpriteEditorProps> = ({
         const finalW = offset.w ?? config.width;
         const finalH = offset.h ?? config.height;
         
-        const isIncluded = activeFrames.includes(frameIndex);
-        const sequenceIndex = activeFrames.indexOf(frameIndex);
+        const isIncluded = activeTimelineFrames.includes(frameIndex);
         
         const isBeingDragged = draggedFrame === frameIndex;
         const isSelected = selectedFrameIndex === frameIndex;
+        const isInteractable = toolMode === 'select';
 
         gridElements.push(
           <div
@@ -291,6 +325,7 @@ const SpriteEditor: React.FC<SpriteEditorProps> = ({
                     : 'border border-gray-600 bg-black/40 hover:border-gray-400 z-10'
               }
               ${isBeingDragged ? 'border-yellow-400 z-50 shadow-[0_0_10px_rgba(250,204,21,0.5)]' : ''}
+              ${!isInteractable ? 'pointer-events-none opacity-50' : ''}
             `}
             style={{
               left: `${finalX}px`,
@@ -300,34 +335,29 @@ const SpriteEditor: React.FC<SpriteEditorProps> = ({
               cursor: isBeingDragged ? 'grabbing' : 'grab'
             }}
           >
-            {/* Frame Number Label (Global Index) */}
+            {/* Frame Number Label */}
             <div className={`absolute top-0 left-0 text-[9px] px-1 font-mono leading-tight pointer-events-none 
               ${isSelected ? 'bg-cyan-500 text-black font-bold' : isIncluded ? 'bg-green-500 text-black font-bold' : 'bg-gray-700 text-gray-400'}`}>
               {frameIndex + 1}
             </div>
 
-            {/* Eye Toggle Button */}
-            <button
-               onClick={(e) => handleFrameToggle(frameIndex, e)}
-               onMouseDown={(e) => e.stopPropagation()} // Prevent drag start
-               className={`absolute top-0 right-0 p-1.5 rounded-bl-lg transition-all z-30 cursor-pointer
-                 ${isIncluded 
-                   ? 'bg-green-500 text-black hover:bg-green-400' 
-                   : 'bg-gray-800 text-gray-500 hover:text-gray-300 hover:bg-gray-700'
-                 }`}
-               title={isIncluded ? "Remove from animation" : "Add to animation"}
-            >
-               {isIncluded ? <Eye size={12} strokeWidth={3} /> : <EyeOff size={12} />}
-            </button>
-
-            {/* Sequence Order Badge (Only if included) */}
-            {isIncluded && sequenceIndex !== undefined && (
-              <div className="absolute bottom-0 right-0 bg-green-500 text-black text-[10px] font-bold px-1.5 rounded-tl-md pointer-events-none">
-                 #{sequenceIndex + 1}
-              </div>
+            {/* Eye Toggle Button - Only visible in select mode */}
+            {toolMode === 'select' && (
+                <button
+                onClick={(e) => handleFrameToggle(frameIndex, e)}
+                onMouseDown={(e) => e.stopPropagation()} 
+                className={`absolute top-0 right-0 p-1.5 rounded-bl-lg transition-all z-30 cursor-pointer pointer-events-auto
+                    ${isIncluded 
+                    ? 'bg-green-500 text-black hover:bg-green-400' 
+                    : 'bg-gray-800 text-gray-500 hover:text-gray-300 hover:bg-gray-700'
+                    }`}
+                title={isIncluded ? "Remove from timeline" : "Append to timeline"}
+                >
+                {isIncluded ? <Eye size={12} strokeWidth={3} /> : <EyeOff size={12} />}
+                </button>
             )}
 
-            {/* Crosshair (if enabled) */}
+            {/* Crosshair */}
             {config.showCrosshair && (
                <div className="absolute inset-0 pointer-events-none opacity-40">
                   <div className="absolute top-1/2 left-0 w-full h-px bg-cyan-300" />
@@ -335,13 +365,13 @@ const SpriteEditor: React.FC<SpriteEditorProps> = ({
                </div>
             )}
             
-            {/* Resize Handles (Only when selected) */}
-            {isSelected && (
+            {/* Resize Handles (Only when selected and in select mode) */}
+            {isSelected && toolMode === 'select' && (
               <>
-                <div data-resize-handle="tl" className="absolute -top-1 -left-1 w-2.5 h-2.5 bg-white border border-black cursor-nwse-resize z-50" />
-                <div data-resize-handle="tr" className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-white border border-black cursor-nesw-resize z-50" />
-                <div data-resize-handle="bl" className="absolute -bottom-1 -left-1 w-2.5 h-2.5 bg-white border border-black cursor-nesw-resize z-50" />
-                <div data-resize-handle="br" className="absolute -bottom-1 -right-1 w-2.5 h-2.5 bg-white border border-black cursor-nwse-resize z-50" />
+                <div data-resize-handle="tl" className="absolute -top-1 -left-1 w-2.5 h-2.5 bg-white border border-black cursor-nwse-resize z-50 pointer-events-auto" />
+                <div data-resize-handle="tr" className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-white border border-black cursor-nesw-resize z-50 pointer-events-auto" />
+                <div data-resize-handle="bl" className="absolute -bottom-1 -left-1 w-2.5 h-2.5 bg-white border border-black cursor-nesw-resize z-50 pointer-events-auto" />
+                <div data-resize-handle="br" className="absolute -bottom-1 -right-1 w-2.5 h-2.5 bg-white border border-black cursor-nwse-resize z-50 pointer-events-auto" />
               </>
             )}
           </div>
@@ -351,14 +381,20 @@ const SpriteEditor: React.FC<SpriteEditorProps> = ({
     return gridElements;
   };
 
+  // Helper to get image dimensions for hit testing
+  const [layerDims, setLayerDims] = useState<{[key:string]: {w:number, h:number}}>({});
+  const onImgLoad = (id: string, e: React.SyntheticEvent<HTMLImageElement>) => {
+     setLayerDims(prev => ({
+         ...prev,
+         [id]: { w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight }
+     }));
+  };
+
   return (
     <div className="relative w-full h-full overflow-hidden bg-gray-900 select-none">
        {/* Hints */}
        <div className="absolute top-4 right-4 z-20 pointer-events-none flex flex-col items-end gap-1 opacity-60">
-          <span className="text-[10px] text-gray-400 bg-black/70 px-2 py-1 rounded">Eye Icon: Toggle Frame</span>
-          <span className="text-[10px] text-gray-400 bg-black/70 px-2 py-1 rounded">Click Frame: Select Properties</span>
-          <span className="text-[10px] text-gray-400 bg-black/70 px-2 py-1 rounded">Drag Handles: Resize</span>
-          <span className="text-[10px] text-gray-400 bg-black/70 px-2 py-1 rounded">LMB Drag: Move Frame Offset</span>
+          <span className="text-[10px] text-gray-400 bg-black/70 px-2 py-1 rounded">Current Tool: {toolMode === 'select' ? 'Frame Edit' : 'Move Layer'}</span>
           <span className="text-[10px] text-gray-400 bg-black/70 px-2 py-1 rounded">Middle / Space+LMB: Pan</span>
        </div>
 
@@ -375,31 +411,45 @@ const SpriteEditor: React.FC<SpriteEditorProps> = ({
         <div 
           className="origin-top-left checkerboard transition-transform duration-75 ease-out"
           style={{
-            width: imgDimensions.w,
-            height: imgDimensions.h,
+            // Large container to allow panning freely
+            width: 20000, 
+            height: 20000,
             transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.scale})`,
             imageRendering: 'pixelated'
           }}
         >
-          {imageSrc && (
-            <img 
-                src={imageSrc} 
-                alt="Sprite Sheet" 
-                className="absolute top-0 left-0 max-w-none pixelated"
-                draggable={false}
-                style={{
-                width: imgDimensions.w,
-                height: imgDimensions.h,
-                pointerEvents: 'none'
-                }}
-            />
-          )}
+          {/* Layer Rendering */}
+          {layers.map(layer => {
+              if (!layer.visible) return null;
+              const isLayerDragged = draggedLayerId === layer.id;
+              
+              return (
+                <img 
+                    key={layer.id}
+                    data-layer-id={layer.id}
+                    data-x={layer.x}
+                    data-y={layer.y}
+                    data-w={layerDims[layer.id]?.w}
+                    data-h={layerDims[layer.id]?.h}
+                    src={layer.imageSrc} 
+                    alt={layer.name} 
+                    onLoad={(e) => onImgLoad(layer.id, e)}
+                    className={`absolute max-w-none pixelated ${toolMode === 'move_layer' ? 'hover:outline outline-2 outline-blue-500 cursor-move' : ''}`}
+                    draggable={false}
+                    style={{
+                        left: layer.x,
+                        top: layer.y,
+                        opacity: layer.opacity,
+                        zIndex: 0, // Layers at bottom
+                        pointerEvents: toolMode === 'move_layer' ? 'auto' : 'none',
+                        outline: isLayerDragged ? '2px solid yellow' : undefined
+                    }}
+                />
+              );
+          })}
           
           {/* Grid Layer */}
-          <div 
-            className="absolute top-0 left-0"
-            style={{ width: imgDimensions.w, height: imgDimensions.h }}
-          >
+          <div className="absolute top-0 left-0">
             {renderGrid()}
           </div>
         </div>

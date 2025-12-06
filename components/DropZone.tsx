@@ -1,5 +1,6 @@
+
 import React, { useCallback } from 'react';
-import { Upload, Image as ImageIcon, FileArchive } from 'lucide-react';
+import { Upload, Image as ImageIcon, FileArchive, Film } from 'lucide-react';
 
 interface DropZoneProps {
   onFileReady: (file: File) => void;
@@ -56,6 +57,7 @@ const DropZone: React.FC<DropZoneProps> = ({ onFileReady }) => {
         </p>
         <div className="text-xs text-gray-600 flex items-center gap-4">
           <span className="flex items-center gap-1"><ImageIcon className="w-4 h-4" /> Images</span>
+          <span className="flex items-center gap-1"><Film className="w-4 h-4" /> Video</span>
           <span className="flex items-center gap-1"><FileArchive className="w-4 h-4" /> .sforge Projects</span>
         </div>
       </div>
@@ -63,7 +65,7 @@ const DropZone: React.FC<DropZoneProps> = ({ onFileReady }) => {
         id="dropzone-file" 
         type="file" 
         className="hidden" 
-        // accept="image/*,.sforge,.zip" // Optional: restrict types
+        // accept="image/*,.sforge,.zip,video/*"
         onChange={handleInputChange}
       />
       <label 

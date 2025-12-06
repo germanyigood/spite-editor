@@ -1,8 +1,9 @@
+
 import React from 'react';
-import { Download, Save, Copy, FileJson, FileCode } from 'lucide-react';
+import { Download, Save, Copy, FileJson, FileCode, FileArchive } from 'lucide-react';
 
 interface ExportPanelProps {
-  onExport: (type: 'download' | 'clipboard' | 'json' | 'ts' | 'project') => void;
+  onExport: (type: 'download' | 'clipboard' | 'json' | 'ts' | 'project' | 'zip-ts') => void;
   copySuccess: boolean;
   disabled: boolean;
 }
@@ -18,7 +19,8 @@ const ExportPanel: React.FC<ExportPanelProps> = ({ onExport, copySuccess, disabl
           <button onClick={() => onExport('download')} disabled={disabled} className="disabled:opacity-50 flex flex-col items-center justify-center p-3 bg-gray-800 hover:bg-gray-700 rounded-lg border border-gray-700 text-xs text-gray-300 gap-1"><Download size={16} /><span>Strip (Active)</span></button>
           <button onClick={() => onExport('clipboard')} disabled={disabled} className="disabled:opacity-50 flex flex-col items-center justify-center p-3 bg-gray-800 hover:bg-gray-700 rounded-lg border border-gray-700 text-xs text-gray-300 gap-1"><Copy size={16} /><span>{copySuccess ? 'Copied' : 'Copy'}</span></button>
           <button onClick={() => onExport('json')} disabled={disabled} className="disabled:opacity-50 flex flex-col items-center justify-center p-3 bg-gray-800 hover:bg-gray-700 rounded-lg border border-gray-700 text-xs text-gray-300 gap-1"><FileJson size={16} /><span>JSON (All)</span></button>
-          <button onClick={() => onExport('ts')} disabled={disabled} className="disabled:opacity-50 flex flex-col items-center justify-center p-3 bg-gray-800 hover:bg-gray-700 rounded-lg border border-gray-700 text-xs text-gray-300 gap-1"><FileCode size={16} /><span>TS (All)</span></button>
+          <button onClick={() => onExport('ts')} disabled={disabled} className="disabled:opacity-50 flex flex-col items-center justify-center p-3 bg-gray-800 hover:bg-gray-700 rounded-lg border border-gray-700 text-xs text-gray-300 gap-1"><FileCode size={16} /><span>TS (Embedded)</span></button>
+          <button onClick={() => onExport('zip-ts')} disabled={disabled} className="disabled:opacity-50 flex flex-col items-center justify-center p-3 bg-gray-800 hover:bg-gray-700 rounded-lg border border-gray-700 text-xs text-gray-300 gap-1"><FileArchive size={16} /><span>TS + Images (Zip)</span></button>
        </div>
     </div>
   );

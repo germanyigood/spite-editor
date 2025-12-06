@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { SpriteConfig, AnimationConfig, BackgroundRemovalConfig, AnimationEntry, SourceLayer } from './types';
-import { sliceFrames, stitchFrames, createProjectBundle, loadProjectBundle, DEFAULT_SPRITE_CONFIG } from './utils';
+import { sliceFrames, stitchFrames, createProjectBundle, loadProjectBundle, createTsCodeZip, DEFAULT_SPRITE_CONFIG } from './utils';
 import { analyzeSpriteSheet } from './services/geminiService';
 import { GripVertical } from 'lucide-react';
 
@@ -12,6 +12,7 @@ import RightSidebar from './components/RightSidebar';
 import DropZone from './components/DropZone';
 import SpriteEditor from './components/SpriteEditor';
 import Timeline from './components/Timeline';
+import VideoProcessorModal from './components/VideoProcessorModal';
 
 const DEFAULT_BG_CONFIG: BackgroundRemovalConfig = {
   enabled: false, 
@@ -28,15 +29,18 @@ const App: React.FC = () => {
   // State
   const [animations, setAnimations] = useState<AnimationEntry[]>([]);
   const [activeAnimationId, setActiveAnimationId] = useState<string>('');
-  const [activeLayerId, setActiveLayerId] = useState<string | null>(null); // New: Track active layer
+  const [activeLayerId, setActiveLayerId] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [previewWidth, setPreviewWidth] = useState(400);
   const [timelineHeight, setTimelineHeight] = useState(180);
   const [copySuccess, setCopySuccess] = useState(false);
-  const [selectedFrameIndex, setSelectedFrameIndex] = useState<number | null>(null); // Grid Index (of active layer)
-  const [selectedTimelineIndex, setSelectedTimelineIndex] = useState<number | null>(null); // Timeline Index
+  const [selectedFrameIndex, setSelectedFrameIndex] = useState<number | null>(null);
+  const [selectedTimelineIndex, setSelectedTimelineIndex] = useState<number | null>(null);
   const [toolMode, setToolMode] = useState<'select' | 'move_layer'>('select');
   const [generatedFrames, setGeneratedFrames] = useState<string[]>([]);
+  
+  // Video Processing State
+  const [pendingVideoFile, setPendingVideoFile] = useState<File | null>(null);
 
   // Derived State
   const currentAnim = useMemo(() => 
@@ -119,14 +123,11 @@ const App: React.FC = () => {
             next.totalFrames = next.rows * value;
         }
         
-        // Preserve frames not cut off? Or just auto-expand?
         next.totalFrames = Math.max(next.totalFrames, prevConfig.totalFrames);
         updateLayer(activeLayerId, { spriteConfig: next });
     };
   };
 
-  // --- Core Logic: Add Frame ---
-  
   const handleAddFrame = useCallback((addToTimeline: boolean = false) => {
       if (!activeLayerId || !currentAnim) {
           alert("Please select a layer first.");
@@ -138,42 +139,32 @@ const App: React.FC = () => {
       const layer = currentAnim.layers[layerIndex];
 
       const newTotal = layer.spriteConfig.totalFrames + 1;
-      const newIndex = newTotal - 1; // Local index of new frame
+      const newIndex = newTotal - 1; 
       
       const w = layer.spriteConfig.width || 64;
       const h = layer.spriteConfig.height || 64;
 
-      // Default frame at 0,0 relative to layer
       const newOffsets = { 
           ...layer.spriteConfig.frameOffsets, 
           [newIndex]: { x: 0, y: 0, w, h } 
       };
 
-      // 1. Update Layer Config
       const newLayers = [...currentAnim.layers];
       newLayers[layerIndex] = {
           ...layer,
           spriteConfig: { ...layer.spriteConfig, totalFrames: newTotal, frameOffsets: newOffsets }
       };
 
-      // 2. Shift Timeline Indices for subsequent layers
-      // Because we inserted a frame in a layer, the global indices of frames 
-      // in SUBSEQUENT layers must be incremented by 1.
       let globalThreshold = 0;
       for (let i = 0; i <= layerIndex; i++) {
-          // Use OLD totalFrames for threshold calculation since existing timeline indices 
-          // were based on the old counts.
           globalThreshold += currentAnim.layers[i].spriteConfig.totalFrames;
       }
       
       let newTimelineFrames = currentAnim.frames.map(idx => idx >= globalThreshold ? idx + 1 : idx);
 
-      // 3. Add to Timeline if requested
       if (addToTimeline) {
-          // Calculate Global Index for the NEW frame
           let thisLayerStart = 0;
           for(let i=0; i<layerIndex; i++) thisLayerStart += currentAnim.layers[i].spriteConfig.totalFrames;
-          
           const newGlobalIndex = thisLayerStart + newIndex; 
           newTimelineFrames = [...newTimelineFrames, newGlobalIndex];
       }
@@ -209,10 +200,12 @@ const App: React.FC = () => {
          setActiveLayerId(null);
          setSelectedFrameIndex(null);
          setGeneratedFrames([]);
+         setPendingVideoFile(null);
     }
   };
 
   const handleFileLoad = useCallback(async (file: File) => {
+    // 1. Project Bundle
     if (file.name.endsWith('.sforge') || file.type.includes('zip') || file.type.includes('compressed')) {
       try {
         setIsProcessing(true);
@@ -220,7 +213,6 @@ const App: React.FC = () => {
         if (loadedEntries.length > 0) {
             setAnimations(loadedEntries);
             setActiveAnimationId(loadedEntries[0].id);
-            // Auto select first layer if exists
             if (loadedEntries[0].layers.length > 0) {
                 setActiveLayerId(loadedEntries[0].layers[0].id);
             } else {
@@ -237,6 +229,13 @@ const App: React.FC = () => {
       return;
     }
 
+    // 2. Video File
+    if (file.type.startsWith('video/')) {
+        setPendingVideoFile(file);
+        return;
+    }
+
+    // 3. Image File
     const reader = new FileReader();
     reader.onload = (e) => {
       if (e.target?.result) {
@@ -245,7 +244,6 @@ const App: React.FC = () => {
         img.onload = () => {
             if (!currentAnim) return;
             
-            // New Layer Config Logic
             const estimatedCols = 4;
             const w = Math.floor(img.naturalWidth / estimatedCols);
             const initialConfig: SpriteConfig = {
@@ -267,7 +265,6 @@ const App: React.FC = () => {
             };
 
             const newLayers = [...currentAnim.layers, newLayer];
-            
             updateEntry(currentAnim.id, { layers: newLayers });
             setActiveLayerId(newLayerId);
         };
@@ -276,6 +273,59 @@ const App: React.FC = () => {
     };
     reader.readAsDataURL(file);
   }, [activeAnimationId, currentAnim, updateEntry]);
+
+  const handleVideoConfirm = (imageSrc: string, config: { rows: number, cols: number, totalFrames: number, frameWidth: number, frameHeight: number }) => {
+      if (!currentAnim || !pendingVideoFile) return;
+
+      const img = new Image();
+      img.onload = () => {
+          // Use the explicit frame dimensions from the export process to avoid rounding errors
+          const w = config.frameWidth;
+          const h = config.frameHeight;
+          
+          const spriteConfig: SpriteConfig = {
+              ...DEFAULT_SPRITE_CONFIG,
+              rows: config.rows,
+              cols: config.cols,
+              width: w,
+              height: h,
+              totalFrames: config.totalFrames
+          };
+
+          const newLayerId = `vid_${Date.now()}`;
+          const newLayer: SourceLayer = {
+              id: newLayerId,
+              name: pendingVideoFile.name,
+              imageSrc,
+              x: 0, y: 0, opacity: 1, visible: true,
+              spriteConfig
+          };
+
+          // Calculate where the new frames will start in the global generated array
+          let globalStartIndex = 0;
+          currentAnim.layers.forEach(l => {
+              globalStartIndex += l.spriteConfig.totalFrames;
+          });
+
+          // Generate indices for the new frames
+          const newFrameIndices = Array.from(
+              { length: config.totalFrames }, 
+              (_, i) => globalStartIndex + i
+          );
+
+          const newLayers = [...currentAnim.layers, newLayer];
+          const newTimeline = [...currentAnim.frames, ...newFrameIndices];
+
+          updateEntry(currentAnim.id, { 
+              layers: newLayers,
+              frames: newTimeline 
+          });
+          
+          setActiveLayerId(newLayerId);
+          setPendingVideoFile(null);
+      };
+      img.src = imageSrc;
+  };
 
   const handleMagicDetect = async () => {
     if (!currentAnim || !activeLayerId) return;
@@ -316,7 +366,7 @@ const App: React.FC = () => {
     }
   };
 
-  const handleExport = async (type: 'download' | 'clipboard' | 'json' | 'ts' | 'project') => {
+  const handleExport = async (type: 'download' | 'clipboard' | 'json' | 'ts' | 'project' | 'zip-ts') => {
       if (type === 'project') {
           const blob = await createProjectBundle(animations);
           const url = URL.createObjectURL(blob);
@@ -327,6 +377,16 @@ const App: React.FC = () => {
           return;
       }
       if (!currentAnim) return;
+
+      if (type === 'zip-ts') {
+          const blob = await createTsCodeZip(animations);
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `sprites-ts.zip`;
+          a.click();
+          return;
+      }
 
       if (type === 'download' || type === 'clipboard') {
           if (playableFrames.length === 0) return alert("No frames in current animation");
@@ -402,6 +462,14 @@ const App: React.FC = () => {
   return (
     <div className="h-full w-full flex flex-col bg-gray-950 text-gray-200">
       
+      {pendingVideoFile && (
+          <VideoProcessorModal 
+             file={pendingVideoFile}
+             onConfirm={handleVideoConfirm}
+             onCancel={() => setPendingVideoFile(null)}
+          />
+      )}
+
       <Header 
         currentAnimId={activeAnimationId}
         showCrosshair={activeLayerId ? currentAnim?.layers.find(l => l.id === activeLayerId)?.spriteConfig.showCrosshair || false : false}
@@ -425,7 +493,6 @@ const App: React.FC = () => {
             activeAnimationId={activeAnimationId}
             onSelectAnim={(id) => { 
                 setActiveAnimationId(id); 
-                // Auto select first layer if available
                 const anim = animations.find(a => a.id === id);
                 if (anim && anim.layers.length > 0) setActiveLayerId(anim.layers[0].id);
                 else setActiveLayerId(null);

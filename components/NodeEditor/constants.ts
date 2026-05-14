@@ -1,0 +1,1 @@
+// This file is deprecated. Node Schemas are now defined in their respective node directories (nodes2/*/index.ts).

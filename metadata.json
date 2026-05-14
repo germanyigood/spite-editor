@@ -1,5 +1,5 @@
 {
-  "name": "SpriteForge AI",
-  "description": "An intelligent sprite sheet editor and animation previewer. Paste your sprites, auto-detect grids using Gemini AI, remove backgrounds, and fine-tune animations in real-time.",
+  "name": "SpriteForge",
+  "description": "An intelligent sprite sheet editor and animation previewer. Paste your sprites, configure grids, remove backgrounds, and fine-tune animations in real-time.",
   "requestFramePermissions": []
 }

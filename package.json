@@ -1,5 +1,5 @@
 {
-  "name": "spriteforge-ai",
+  "name": "spriteforge",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -9,15 +9,23 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "react": "^19.2.1",
-    "react-dom": "^19.2.1",
-    "lucide-react": "^0.555.0",
     "@google/genai": "^1.31.0",
-    "jszip": "^3.10.1"
+    "@react-three/drei": "^10.7.7",
+    "@react-three/fiber": "^9.4.2",
+    "@react-three/postprocessing": "^3.0.4",
+    "jszip": "^3.10.1",
+    "lucide-react": "^0.469.0",
+    "pako": "^2.1.0",
+    "react": "^19.2.1",
+    "react-dom": "^19.2.3",
+    "three": "^0.181.2",
+    "upng-js": "^2.1.0",
+    "yup": "^1.4.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
     "@vitejs/plugin-react": "^5.0.0",
+    "puppeteer": "^24.43.1",
     "typescript": "~5.8.2",
     "vite": "^6.2.0"
   }

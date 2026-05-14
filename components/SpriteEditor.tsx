@@ -1,464 +1,264 @@
 
-import React, { useRef, useEffect, useState } from 'react';
-import { SpriteConfig, AnimationEntry, SourceLayer } from '../types';
-import { Plus } from 'lucide-react';
+import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
+import { useProject } from '../context/ProjectContext';
+import { getGraphLayers, getGraphTimeline, findModifierByType, findLastModifier, loadBitmap, DEFAULT_SPRITE_CONFIG, generateGridFrames } from '../utils';
+import { NodePayload, PaintNode, PaintConfig, ViewportTransform, WarpNode, SourceNode } from '../types';
+
+import { LayerRenderer } from './sprite-editor/LayerRenderer';
+import { FrameOverlay } from './sprite-editor/FrameOverlay';
+import { useSpriteInteraction } from './sprite-editor/useSpriteInteraction';
+import { SelectionOverlay } from './sprite-editor/SelectionOverlay';
+import { InfiniteCanvas } from './common/InfiniteCanvas';
+
+// Icons
+import { Brush, Eraser, BoxSelect } from 'lucide-react';
+import { ColorPicker, Slider } from './common/DesignSystem';
 
 interface SpriteEditorProps {
-  entry: AnimationEntry;
-  activeAnimationId: string;
-  activeLayerId: string | null;
-  selectedFrameIndex: number | null; // This is the GRID index (source frame)
-  onEntryUpdate: (updates: Partial<AnimationEntry>) => void;
-  onLayerUpdate: (layerId: string, updates: Partial<SourceLayer>) => void;
-  onFrameSelect: (index: number | null) => void;
-  toolMode: 'select' | 'move_layer';
+    nodeOutputs?: Record<string, NodePayload | null>;
+    style?: React.CSSProperties;
+    className?: string;
 }
 
-const SpriteEditor: React.FC<SpriteEditorProps> = ({ 
-  entry,
-  activeAnimationId, 
-  activeLayerId,
-  selectedFrameIndex,
-  onEntryUpdate,
-  onLayerUpdate,
-  onFrameSelect,
-  toolMode
-}) => {
-  const { layers, frames: activeTimelineFrames } = entry;
+const SpriteEditor: React.FC<SpriteEditorProps> = ({ nodeOutputs = {}, style, className }) => {
+  const { state, dispatch } = useProject();
+  const { animations, activeAnimationId, activeLayerId, toolMode } = state;
+  const entry = animations.find(a => a.id === activeAnimationId);
+
   const containerRef = useRef<HTMLDivElement>(null);
-  
-  // Transform State (Pan/Zoom)
   const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 });
   
-  // Interaction State
-  const [isPanning, setIsPanning] = useState(false);
-  const [draggedFrame, setDraggedFrame] = useState<number | null>(null);
-  const [resizingFrame, setResizingFrame] = useState<{index: number, handle: string} | null>(null);
-  
-  // Layer Dragging
-  const [draggedLayerId, setDraggedLayerId] = useState<string | null>(null);
+  const paintNode = useMemo(() => {
+      if (!entry || !activeLayerId) return undefined;
+      return findModifierByType(entry.nodeGraph, activeLayerId, 'paint') as PaintNode | undefined;
+  }, [entry?.nodeGraph, activeLayerId]);
 
-  const lastMousePos = useRef({ x: 0, y: 0 });
-  const isSpacePressed = useRef(false);
+  const warpNode = useMemo(() => {
+      if (!entry || !activeLayerId) return undefined;
+      return findModifierByType(entry.nodeGraph, activeLayerId, 'warp') as WarpNode | undefined;
+  }, [entry?.nodeGraph, activeLayerId]);
 
-  // Derive the Active Layer Config
-  const activeLayer = layers.find(l => l.id === activeLayerId);
-  const activeConfig = activeLayer?.spriteConfig;
+  const [drawTool, setDrawTool] = useState<'brush' | 'eraser' | 'select'>('brush');
+  const [selectionRect, setSelectionRect] = useState<{x:number, y:number, w:number, h:number} | null>(null);
 
-  // Track space key for panning
+  const [brushSettings, setBrushSettings] = useState<PaintConfig>({
+      brushSize: 20, brushColor: '#000000', brushOpacity: 1.0, brushHardness: 0.8, isEraser: false
+  });
+
+  // Синхронизация локального состояния инструмента с данными ноды
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.code === 'Space') {
-        isSpacePressed.current = true;
+      if(paintNode) {
+          setBrushSettings(prev => ({ ...prev, ...paintNode.data }));
+          if (paintNode.data.isEraser) setDrawTool('eraser');
+          else if (drawTool === 'eraser') setDrawTool('brush');
       }
-    };
-    const handleKeyUp = (e: KeyboardEvent) => {
-      if (e.code === 'Space') {
-        isSpacePressed.current = false;
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('keyup', handleKeyUp);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('keyup', handleKeyUp);
-    };
-  }, []);
+  }, [paintNode?.id, paintNode?.data.isEraser]);
 
-  // --- Input Handlers ---
+  const [cursorPos, setCursorPos] = useState<{x: number, y: number} | null>(null);
+  const [isHoveringEditor, setIsHoveringEditor] = useState(false);
 
-  const handleWheel = (e: React.WheelEvent) => {
-    e.preventDefault();
-    const scaleAmount = -e.deltaY * 0.001;
-    const newScale = Math.min(Math.max(0.1, transform.scale * (1 + scaleAmount)), 10);
-    
-    const rect = containerRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
-    
-    const scaleRatio = newScale / transform.scale;
-    const newX = mouseX - (mouseX - transform.x) * scaleRatio;
-    const newY = mouseY - (mouseY - transform.y) * scaleRatio;
+  useEffect(() => {
+      if (entry?.editorTransform) setTransform(entry.editorTransform);
+  }, [entry?.editorTransform, entry?.id]);
 
-    setTransform({ x: newX, y: newY, scale: newScale });
+  if (!entry) return null;
+
+  const layers = getGraphLayers(entry.nodeGraph);
+  const activeTimelineFrames = getGraphTimeline(entry.nodeGraph);
+  const activePair = layers.find(p => p.source.id === activeLayerId);
+  const activeSource = activePair?.source;
+  const activeConfig = activePair?.slice?.data;
+
+  const { handleMouseDown, handleSelectionMouseDown, handleFrameMouseDown, handleWarpPinMouseDown, isPanning, visualFrame, visualLayerPos, visualPins } = useSpriteInteraction(
+      containerRef, transform, setTransform, entry, activeLayerId, activeSource, activeConfig, layers, warpNode, selectionRect,
+      toolMode === 'draw' && drawTool === 'select' ? setSelectionRect : undefined
+  );
+
+  const handleTransformChange = (newTransform: ViewportTransform) => {
+      setTransform(newTransform);
+      dispatch({ type: 'UPDATE_EDITOR_TRANSFORM', payload: { animId: entry.id, transform: newTransform } });
   };
 
-  const handleMouseDown = (e: React.MouseEvent) => {
-    lastMousePos.current = { x: e.clientX, y: e.clientY };
+  const updatePaintNode = (updates: Partial<PaintConfig>) => {
+      if (!paintNode) return;
+      const newData = { ...brushSettings, ...updates };
+      setBrushSettings(newData);
+      dispatch({ type: 'UPDATE_NODE_DATA', payload: { animId: entry.id, nodeId: paintNode.id, data: updates } });
+  };
 
-    // Space + Click OR Middle Click = PAN
-    if (e.button === 1 || (e.button === 0 && isSpacePressed.current)) {
-      setIsPanning(true);
-      return;
-    }
+  const setLocalDrawTool = (tool: 'brush' | 'eraser' | 'select') => {
+      setDrawTool(tool);
+      if (tool !== 'select') {
+          updatePaintNode({ isEraser: tool === 'eraser' });
+      }
+  };
 
-    const rect = containerRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
-    const imgX = (mouseX - transform.x) / transform.scale;
-    const imgY = (mouseY - transform.y) / transform.scale;
+  const performExtraction = useCallback(async (isCut: boolean) => {
+      if (!selectionRect || !activeSource || !entry || !paintNode) return;
+      
+      const lastMod = findLastModifier(entry.nodeGraph, activeSource.id);
+      const payload = nodeOutputs[lastMod?.id || activeSource.id];
+      if (!payload || payload.type !== 'IMAGE') return;
 
-    // --- TOOL: MOVE LAYER ---
-    if (toolMode === 'move_layer' && e.button === 0) {
-        const layerElements = document.querySelectorAll(`[data-layer-id]`);
-        let hitLayerId: string | null = null;
-        
-        for (let i = layerElements.length - 1; i >= 0; i--) {
-            const el = layerElements[i] as HTMLElement;
-            const lid = el.dataset.layerId;
-            const lx = parseFloat(el.dataset.x || '0');
-            const ly = parseFloat(el.dataset.y || '0');
-            const lw = parseFloat(el.dataset.w || '0');
-            const lh = parseFloat(el.dataset.h || '0');
-            
-            if (imgX >= lx && imgX <= lx + lw && imgY >= ly && imgY <= ly + lh) {
-                hitLayerId = lid || null;
-                break;
-            }
-        }
-        
-        if (hitLayerId) {
-            setDraggedLayerId(hitLayerId);
-            return;
-        }
-    }
+      try {
+          const bmp = await loadBitmap(payload.image);
+          const layerX = activeSource.data.x || 0;
+          const layerY = activeSource.data.y || 0;
+          const relX = selectionRect.x - layerX;
+          const relY = selectionRect.y - layerY;
 
+          const safeX = Math.max(0, Math.min(relX, bmp.width));
+          const safeY = Math.max(0, Math.min(relY, bmp.height));
+          const safeW = Math.min(selectionRect.w, bmp.width - safeX);
+          const safeH = Math.min(selectionRect.h, bmp.height - safeY);
 
-    // --- TOOL: SELECT FRAME ---
-    if (toolMode === 'select' && activeLayer && activeConfig) {
-        // Check if clicking a Resize Handle
-        const target = e.target as HTMLElement;
-        if (target.dataset.resizeHandle && selectedFrameIndex !== null) {
-          setResizingFrame({ index: selectedFrameIndex, handle: target.dataset.resizeHandle });
-          e.stopPropagation();
-          return;
-        }
+          if (safeW < 2 || safeH < 2) return;
 
-        // Check Frame Hit on the ACTIVE LAYER
-        if (e.button === 0) {
-          let clickedFrameIndex: number | null = null;
-          
-          // Layer Origin
-          const lx = activeLayer.x;
-          const ly = activeLayer.y;
+          const fragmentCanvas = document.createElement('canvas');
+          fragmentCanvas.width = safeW;
+          fragmentCanvas.height = safeH;
+          const fCtx = fragmentCanvas.getContext('2d')!;
+          fCtx.drawImage(bmp, safeX, safeY, safeW, safeH, 0, 0, safeW, safeH);
+          const extractedDataUrl = fragmentCanvas.toDataURL();
 
-          for (let r = 0; r < activeConfig.rows; r++) {
-              for (let c = 0; c < activeConfig.cols; c++) {
-              const idx = r * activeConfig.cols + c;
-              if (idx >= activeConfig.totalFrames) continue;
+          dispatch({
+              type: 'ADD_LAYER',
+              payload: {
+                  animId: entry.id,
+                  layer: {
+                      name: `${activeSource.data.name}_extracted`,
+                      imageSrc: extractedDataUrl,
+                      width: safeW, height: safeH,
+                      x: selectionRect.x, y: selectionRect.y,
+                      spriteConfig: { ...DEFAULT_SPRITE_CONFIG, width: safeW, height: safeH, frames: generateGridFrames(1, 1, safeW, safeH, 0, 0, 0) }
+                  }
+              }
+          });
 
-              // Position logic relative to layer
-              let bx = activeConfig.offsetX + c * (activeConfig.width + activeConfig.margin);
-              let by = activeConfig.offsetY + r * (activeConfig.height + activeConfig.margin);
+          if (isCut) {
+              const pCanvas = document.createElement('canvas');
+              pCanvas.width = activeSource.data.width;
+              pCanvas.height = activeSource.data.height;
+              const pCtx = pCanvas.getContext('2d')!;
               
-              const off = activeConfig.frameOffsets[idx] || {x: 0, y: 0};
-              const fW = off.w ?? activeConfig.width;
-              const fH = off.h ?? activeConfig.height;
-
-              // Absolute canvas coords
-              const curX = lx + bx + off.x;
-              const curY = ly + by + off.y;
-
-              if (imgX >= curX && imgX < curX + fW && 
-                  imgY >= curY && imgY < curY + fH) {
-                  
-                  clickedFrameIndex = idx;
-                  setDraggedFrame(idx);
-                  break;
+              // FIX: If no paintData exists yet, load the ORIGINAL SOURCE first.
+              // Otherwise we are cutting a hole in a transparent canvas, and the layer disappears.
+              const baseSrc = paintNode.data.paintData || activeSource.data.src;
+              
+              if (baseSrc) {
+                  const baseBmp = await loadBitmap(baseSrc);
+                  pCtx.drawImage(baseBmp, 0, 0);
               }
-              }
-              if (clickedFrameIndex !== null) break;
+              
+              pCtx.clearRect(safeX, safeY, safeW, safeH);
+              
+              pCanvas.toBlob((blob) => {
+                  if (blob) {
+                      const url = URL.createObjectURL(blob);
+                      dispatch({
+                          type: 'UPDATE_NODE_DATA',
+                          payload: { animId: entry.id, nodeId: paintNode.id, data: { paintData: url } }
+                      });
+                  }
+              }, 'image/png');
           }
 
-          onFrameSelect(clickedFrameIndex);
-        }
-    }
-  };
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    const dx = e.clientX - lastMousePos.current.x;
-    const dy = e.clientY - lastMousePos.current.y;
-    lastMousePos.current = { x: e.clientX, y: e.clientY };
-
-    const imgDx = dx / transform.scale;
-    const imgDy = dy / transform.scale;
-
-    if (isPanning) {
-      setTransform(prev => ({ ...prev, x: prev.x + dx, y: prev.y + dy }));
-    } 
-    else if (draggedLayerId) {
-        onLayerUpdate(draggedLayerId, { 
-             x: (layers.find(l => l.id === draggedLayerId)?.x || 0) + imgDx,
-             y: (layers.find(l => l.id === draggedLayerId)?.y || 0) + imgDy
-        });
-    }
-    else if (resizingFrame && activeLayerId && activeConfig) {
-      const idx = resizingFrame.index;
-      const currentOffset = activeConfig.frameOffsets[idx] || { x: 0, y: 0 };
-      const curW = currentOffset.w ?? activeConfig.width;
-      const curH = currentOffset.h ?? activeConfig.height;
-
-      let newOff = { ...currentOffset };
-
-      switch (resizingFrame.handle) {
-        case 'br': 
-          newOff.w = Math.max(4, curW + imgDx);
-          newOff.h = Math.max(4, curH + imgDy);
-          break;
-        case 'bl': 
-          const wChangeL = Math.min(curW - 4, imgDx);
-          newOff.x = (newOff.x || 0) + wChangeL;
-          newOff.w = curW - wChangeL;
-          newOff.h = Math.max(4, curH + imgDy);
-          break;
-        case 'tr': 
-          const hChangeT = Math.min(curH - 4, imgDy);
-          newOff.y = (newOff.y || 0) + hChangeT;
-          newOff.h = curH - hChangeT;
-          newOff.w = Math.max(4, curW + imgDx);
-          break;
-        case 'tl': 
-          const wChange = Math.min(curW - 4, imgDx);
-          const hChange = Math.min(curH - 4, imgDy);
-          newOff.x = (newOff.x || 0) + wChange;
-          newOff.y = (newOff.y || 0) + hChange;
-          newOff.w = curW - wChange;
-          newOff.h = curH - hChange;
-          break;
+          setSelectionRect(null);
+      } catch (e) {
+          console.error("Extraction failed", e);
       }
+  }, [selectionRect, activeSource, entry, nodeOutputs, paintNode, dispatch]);
 
-      onLayerUpdate(activeLayerId, {
-          spriteConfig: {
-              ...activeConfig,
-              frameOffsets: { ...activeConfig.frameOffsets, [idx]: newOff }
-          }
-      });
-    }
-    else if (draggedFrame !== null && activeLayerId && activeConfig) {
-      const currentOffset = activeConfig.frameOffsets[draggedFrame] || { x: 0, y: 0 };
-      const newOffset = {
-        ...currentOffset,
-        x: currentOffset.x + imgDx,
-        y: currentOffset.y + imgDy
-      };
-
-      onLayerUpdate(activeLayerId, {
-        spriteConfig: {
-            ...activeConfig,
-            frameOffsets: { ...activeConfig.frameOffsets, [draggedFrame]: newOffset }
-        }
-      });
-    }
-  };
-
-  const handleMouseUp = () => {
-    setIsPanning(false);
-    setDraggedFrame(null);
-    setResizingFrame(null);
-    setDraggedLayerId(null);
-  };
-
-  const handleAddToTimeline = (e: React.MouseEvent, frameGlobalIndex: number) => {
-    e.stopPropagation();
-    e.preventDefault(); 
-    // Always append to timeline
-    const newFrames = [...activeTimelineFrames, frameGlobalIndex];
-    onEntryUpdate({ frames: newFrames });
-  };
-
-
-  // Visual Grid Overlay - Only for Active Layer
-  const renderGrid = () => {
-    if (!activeLayer || !activeConfig) return null;
-
-    const gridElements = [];
-    
-    // We need to calculate the "global frame index" for the timeline toggle to work.
-    // The frames array is flat: [Layer0 Frames, Layer1 Frames...]
-    // Calculate offset for current layer
-    let globalFrameOffset = 0;
-    for (const l of layers) {
-        if (l.id === activeLayer.id) break;
-        globalFrameOffset += l.spriteConfig.totalFrames;
-    }
-
-    for (let r = 0; r < activeConfig.rows; r++) {
-      for (let c = 0; c < activeConfig.cols; c++) {
-        const frameIndex = r * activeConfig.cols + c;
-        if (frameIndex >= activeConfig.totalFrames) continue;
-
-        const globalIndex = globalFrameOffset + frameIndex;
-
-        // Base relative to layer
-        const baseX = activeConfig.offsetX + c * (activeConfig.width + activeConfig.margin);
-        const baseY = activeConfig.offsetY + r * (activeConfig.height + activeConfig.margin);
-        
-        // Offset & Dimensions
-        const offset = activeConfig.frameOffsets[frameIndex] || { x: 0, y: 0 };
-        // Absolute position on canvas
-        const finalX = activeLayer.x + baseX + offset.x;
-        const finalY = activeLayer.y + baseY + offset.y;
-        
-        const finalW = offset.w ?? activeConfig.width;
-        const finalH = offset.h ?? activeConfig.height;
-        
-        // Count how many times this frame appears in the timeline
-        const usageCount = activeTimelineFrames.filter(idx => idx === globalIndex).length;
-        
-        const isBeingDragged = draggedFrame === frameIndex;
-        const isSelected = selectedFrameIndex === frameIndex;
-        const isInteractable = toolMode === 'select';
-
-        gridElements.push(
-          <div
-            key={`${activeLayer.id}_${frameIndex}`}
-            className={`absolute transition-colors box-border group select-none
-              ${isSelected 
-                ? 'border-2 border-cyan-400 z-40' 
-                : usageCount > 0 
-                    ? 'border border-blue-400 bg-blue-500/5 z-20' 
-                    : 'border border-gray-600 bg-black/40 hover:border-gray-400 z-10'
-              }
-              ${isBeingDragged ? 'border-yellow-400 z-50 shadow-[0_0_10px_rgba(250,204,21,0.5)]' : ''}
-              ${!isInteractable ? 'pointer-events-none opacity-50' : ''}
-            `}
-            style={{
-              left: `${finalX}px`,
-              top: `${finalY}px`,
-              width: `${finalW}px`,
-              height: `${finalH}px`,
-              cursor: isBeingDragged ? 'grabbing' : 'grab'
-            }}
-          >
-            {/* Frame Number Label */}
-            <div className={`absolute top-0 left-0 text-[9px] px-1 font-mono leading-tight pointer-events-none 
-              ${isSelected ? 'bg-cyan-500 text-black font-bold' : usageCount > 0 ? 'bg-blue-500 text-black font-bold' : 'bg-gray-700 text-gray-400'}`}>
-              {frameIndex + 1}
-            </div>
-            
-            {/* Usage Count Badge (Bottom Right) */}
-            {usageCount > 0 && (
-                <div className="absolute bottom-0 right-0 bg-blue-600 text-[9px] text-white px-1.5 rounded-tl font-bold pointer-events-none">
-                    x{usageCount}
-                </div>
-            )}
-
-            {/* Add to Timeline Button */}
-            {toolMode === 'select' && (
-                <button
-                onClick={(e) => handleAddToTimeline(e, globalIndex)}
-                onMouseDown={(e) => e.stopPropagation()} 
-                className={`absolute top-0 right-0 p-1 rounded-bl-lg transition-all z-30 cursor-pointer pointer-events-auto shadow-sm
-                    ${usageCount > 0 
-                    ? 'bg-blue-600 text-white hover:bg-blue-500' 
-                    : 'bg-gray-800 text-gray-500 hover:text-white hover:bg-blue-600'
-                    }`}
-                title="Add to timeline"
-                >
-                <Plus size={12} strokeWidth={3} />
-                </button>
-            )}
-
-            {/* Crosshair */}
-            {activeConfig.showCrosshair && (
-               <div className="absolute inset-0 pointer-events-none opacity-40">
-                  <div className="absolute top-1/2 left-0 w-full h-px bg-cyan-300" />
-                  <div className="absolute top-0 left-1/2 h-full w-px bg-cyan-300" />
-               </div>
-            )}
-            
-            {/* Resize Handles */}
-            {isSelected && toolMode === 'select' && (
-              <>
-                <div data-resize-handle="tl" className="absolute -top-1 -left-1 w-2.5 h-2.5 bg-white border border-black cursor-nwse-resize z-50 pointer-events-auto" />
-                <div data-resize-handle="tr" className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-white border border-black cursor-nesw-resize z-50 pointer-events-auto" />
-                <div data-resize-handle="bl" className="absolute -bottom-1 -left-1 w-2.5 h-2.5 bg-white border border-black cursor-nesw-resize z-50 pointer-events-auto" />
-                <div data-resize-handle="br" className="absolute -bottom-1 -right-1 w-2.5 h-2.5 bg-white border border-black cursor-nwse-resize z-50 pointer-events-auto" />
-              </>
-            )}
-          </div>
-        );
-      }
-    }
-    return gridElements;
-  };
-
-  const [layerDims, setLayerDims] = useState<{[key:string]: {w:number, h:number}}>({});
-  const onImgLoad = (id: string, e: React.SyntheticEvent<HTMLImageElement>) => {
-     setLayerDims(prev => ({
-         ...prev,
-         [id]: { w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight }
-     }));
-  };
+  const cursorStyle = isPanning ? 'cursor-grabbing' : (toolMode === 'draw' && (drawTool === 'brush' || drawTool === 'eraser') ? 'cursor-none' : 'cursor-default');
 
   return (
-    <div className="relative w-full h-full overflow-hidden bg-gray-900 select-none">
-       <div className="absolute top-4 right-4 z-20 pointer-events-none flex flex-col items-end gap-1 opacity-60">
-          <span className="text-[10px] text-gray-400 bg-black/70 px-2 py-1 rounded">Current Tool: {toolMode === 'select' ? 'Frame Edit' : 'Move Layer'}</span>
-          <span className="text-[10px] text-gray-400 bg-black/70 px-2 py-1 rounded">Middle / Space+LMB: Pan</span>
-          {activeLayer && <span className="text-[10px] text-cyan-400 bg-black/70 px-2 py-1 rounded">Active: {activeLayer.name}</span>}
-       </div>
-
-      <div 
-        ref={containerRef}
-        className={`w-full h-full ${isPanning ? 'cursor-grabbing' : 'cursor-default'}`}
-        onWheel={handleWheel}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
-        onContextMenu={(e) => e.preventDefault()} 
-      >
-        <div 
-          className="origin-top-left checkerboard transition-transform duration-75 ease-out"
-          style={{
-            width: 20000, 
-            height: 20000,
-            transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.scale})`,
-            imageRendering: 'pixelated'
-          }}
+    <div className={`w-full h-full relative ${className || ''}`} style={style}>
+        <InfiniteCanvas
+            ref={containerRef}
+            className={cursorStyle}
+            transform={transform}
+            onChange={handleTransformChange}
+            onMouseDown={handleMouseDown}
+            onMouseMove={(e) => {
+                const rect = containerRef.current?.getBoundingClientRect();
+                if(rect) setCursorPos({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+            }}
+            onMouseEnter={() => setIsHoveringEditor(true)}
+            onMouseLeave={() => setIsHoveringEditor(false)}
         >
-          {/* Layer Rendering */}
-          {layers.map(layer => {
-              if (!layer.visible) return null;
-              const isLayerDragged = draggedLayerId === layer.id;
-              const isActive = activeLayerId === layer.id;
-              
-              return (
-                <img 
-                    key={layer.id}
-                    data-layer-id={layer.id}
-                    data-x={layer.x}
-                    data-y={layer.y}
-                    data-w={layerDims[layer.id]?.w}
-                    data-h={layerDims[layer.id]?.h}
-                    src={layer.imageSrc} 
-                    alt={layer.name} 
-                    onLoad={(e) => onImgLoad(layer.id, e)}
-                    className={`absolute max-w-none pixelated 
-                        ${toolMode === 'move_layer' ? 'hover:outline outline-2 outline-blue-500 cursor-move' : ''}
-                    `}
-                    draggable={false}
-                    style={{
-                        left: layer.x,
-                        top: layer.y,
-                        opacity: layer.opacity * (isActive || toolMode !== 'select' ? 1 : 0.5), // Dim inactive layers when editing
-                        zIndex: 0,
-                        pointerEvents: toolMode === 'move_layer' ? 'auto' : 'none',
-                        outline: isLayerDragged ? '2px solid yellow' : (isActive && toolMode === 'select' ? '1px dashed cyan' : undefined)
-                    }}
+            {layers.map(({source}) => {
+                const isDraggingThis = visualLayerPos && visualLayerPos.id === source.id;
+                const override = isDraggingThis ? visualLayerPos : undefined;
+                const isActive = activeLayerId === source.id;
+
+                return (
+                    <LayerRenderer 
+                        key={source.id}
+                        layer={source} 
+                        graph={entry.nodeGraph} 
+                        isSelected={isActive}
+                        toolMode={toolMode}
+                        drawTool={drawTool}
+                        nodeOutputs={nodeOutputs}
+                        overridePos={override}
+                    />
+                );
+            })}
+
+            {toolMode === 'draw' && selectionRect && (
+                <SelectionOverlay 
+                    rect={selectionRect} scale={transform.scale}
+                    onCopy={() => performExtraction(false)} 
+                    onCut={() => performExtraction(true)} 
+                    onClear={() => setSelectionRect(null)}
+                    onMouseDown={handleSelectionMouseDown}
                 />
-              );
-          })}
-          
-          <div className="absolute top-0 left-0">
-            {renderGrid()}
-          </div>
-        </div>
-      </div>
+            )}
+
+            {activeSource && activeConfig && activeConfig.frames && toolMode === 'select' && (
+                <FrameOverlay 
+                    activeSource={activeSource} activeConfig={activeConfig}
+                    selectedFrameIndex={state.selectedFrameIndex} toolMode={toolMode}
+                    visualFrame={visualFrame} visualLayerPos={visualLayerPos}
+                    entry={entry} layers={layers} timelineCounts={{}}
+                    onFrameMouseDown={handleFrameMouseDown}
+                />
+            )}
+        </InfiniteCanvas>
+
+        {toolMode === 'draw' && isHoveringEditor && (drawTool === 'brush' || drawTool === 'eraser') && cursorPos && (
+            <div 
+                className={`absolute pointer-events-none z-[1000] border rounded-full mix-blend-difference ${drawTool === 'eraser' ? 'border-red-500 ring-2 ring-red-500/20' : 'border-white/50'}`}
+                style={{ 
+                    left: cursorPos.x, top: cursorPos.y, 
+                    width: (brushSettings.brushSize || 20) * transform.scale, 
+                    height: (brushSettings.brushSize || 20) * transform.scale, 
+                    transform: 'translate(-50%, -50%)' 
+                }}
+            />
+        )}
+
+        {toolMode === 'draw' && (
+            <div className="absolute bottom-10 left-1/2 -translate-x-1/2 flex items-center gap-2 p-2 bg-panel/90 backdrop-blur-2xl rounded-2xl border border-white/10 shadow-2xl z-[100] animate-in slide-in-from-bottom-5">
+                <div className="flex bg-surface/50 p-1 rounded-xl gap-1">
+                    <button onClick={() => setLocalDrawTool('brush')} className={`p-2 rounded-lg transition-all ${drawTool === 'brush' ? 'bg-pink-600 text-white shadow-lg' : 'text-txt-secondary hover:text-white'}`} title="Brush Tool (B)"><Brush size={18} /></button>
+                    <button onClick={() => setLocalDrawTool('eraser')} className={`p-2 rounded-lg transition-all ${drawTool === 'eraser' ? 'bg-red-600 text-white shadow-lg shadow-red-900/40' : 'text-txt-secondary hover:text-white'}`} title="Eraser Tool (E)"><Eraser size={18} /></button>
+                    <button onClick={() => setLocalDrawTool('select')} className={`p-2 rounded-lg transition-all ${drawTool === 'select' ? 'bg-indigo-600 text-white shadow-lg' : 'text-txt-secondary hover:text-white'}`} title="Selection Tool (S)"><BoxSelect size={18} /></button>
+                </div>
+                
+                {drawTool !== 'select' && (
+                    <>
+                        <div className="w-px h-8 bg-white/5 mx-2" />
+                        <div className="w-32 px-2">
+                             <Slider min={1} max={100} value={brushSettings.brushSize} onChange={(v) => updatePaintNode({brushSize: v})} accent={drawTool === 'eraser' ? "red" as any : "pink"} />
+                        </div>
+                        {drawTool === 'brush' && (
+                            <ColorPicker value={brushSettings.brushColor} onChange={(v) => updatePaintNode({brushColor: v})} accent="pink" className="bg-transparent border-none p-0 w-24" />
+                        )}
+                    </>
+                )}
+            </div>
+        )}
     </div>
   );
 };

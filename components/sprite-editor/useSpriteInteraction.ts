@@ -24,6 +24,11 @@ export const useSpriteInteraction = (
     const [visualPins, setVisualPins] = useState<Array<{x: number, y: number}>>([]);
     const [isPanning, setIsPanning] = useState(false);
 
+    const transformRef = useRef(transform);
+    useEffect(() => {
+        transformRef.current = transform;
+    }, [transform]);
+
     const selectionRectRef = useRef<{x:number, y:number, w:number, h:number} | null>(selectionRect);
 
     useEffect(() => {
@@ -102,13 +107,22 @@ export const useSpriteInteraction = (
 
     const handleSelectionMouseDown = (e: React.MouseEvent, id: string | number, handle?: string) => {
         if (!onSelectionChange || !selectionRectRef.current) return;
+        if (e.button === 1 || isSpacePressed.current) {
+            setIsPanning(true);
+            dragRef.current = { startX: e.clientX, startY: e.clientY, mode: 'pan' };
+            return;
+        }
         e.stopPropagation();
         dragRef.current = { mode: handle ? 'selection_resize' : 'selection_move', resizeHandle: handle, startX: e.clientX, startY: e.clientY, initialRect: { ...selectionRectRef.current } };
     };
 
     const handleFrameMouseDown = (e: React.MouseEvent, id: string | number, handle?: string) => {
         if (toolMode !== 'select' || !activeConfig || !activeConfig.frames) return;
-        if (e.button === 1 || isSpacePressed.current) return;
+        if (e.button === 1 || isSpacePressed.current) {
+            setIsPanning(true);
+            dragRef.current = { startX: e.clientX, startY: e.clientY, mode: 'pan' };
+            return;
+        }
         const frameIndex = Number(id);
         const frame = activeConfig.frames[frameIndex];
         if (!frame) return;
@@ -118,8 +132,13 @@ export const useSpriteInteraction = (
     };
 
     const handleWarpPinMouseDown = (e: React.MouseEvent, index: number) => {
+        if (e.button === 1 || isSpacePressed.current) {
+            setIsPanning(true);
+            dragRef.current = { startX: e.clientX, startY: e.clientY, mode: 'pan' };
+            return;
+        }
         e.stopPropagation();
-        if (e.button !== 0 || isSpacePressed.current) return;
+        if (e.button !== 0) return;
         if (!warpNode?.data.pins) return;
         dragRef.current = { mode: 'warp_pin', targetId: index, startX: e.clientX, startY: e.clientY, initialPins: [...(warpNode.data.pins)] };
     };
@@ -137,8 +156,8 @@ export const useSpriteInteraction = (
                 return;
             }
 
-            const zDx = dx / transform.scale;
-            const zDy = dy / transform.scale;
+            const zDx = dx / transformRef.current.scale;
+            const zDy = dy / transformRef.current.scale;
 
             if (dragRef.current.mode === 'selection' && dragRef.current.selectionOrigin && onSelectionChange) {
                 const ox = dragRef.current.selectionOrigin.x;
@@ -201,8 +220,8 @@ export const useSpriteInteraction = (
             const { mode, targetId, initialFrame, startX, startY, initialLayerPos, initialPins } = dragRef.current;
             const dx = e.clientX - startX;
             const dy = e.clientY - startY;
-            const zDx = dx / transform.scale;
-            const zDy = dy / transform.scale;
+            const zDx = dx / transformRef.current.scale;
+            const zDy = dy / transformRef.current.scale;
 
             if (mode === 'layer' && initialLayerPos) {
                 dispatch({ type: 'UPDATE_LAYER', payload: { animId: entry.id, layerId: targetId as string, updates: { x: Math.round(initialLayerPos.x + zDx), y: Math.round(initialLayerPos.y + zDy) }, resetTimeline: false } });
@@ -223,7 +242,7 @@ export const useSpriteInteraction = (
             }
 
             if (mode === 'pan') {
-                dispatch({ type: 'UPDATE_EDITOR_TRANSFORM', payload: { animId: entry.id, transform } });
+                dispatch({ type: 'UPDATE_EDITOR_TRANSFORM', payload: { animId: entry.id, transform: transformRef.current } });
             }
 
             dragRef.current = { startX: 0, startY: 0, mode: 'none' };
@@ -236,7 +255,7 @@ export const useSpriteInteraction = (
             window.removeEventListener('mousemove', handleWindowMove);
             window.removeEventListener('mouseup', handleWindowUp);
         };
-    }, [activeLayerId, activeConfig, transform, dispatch, entry.id, warpNode, onSelectionChange]);
+    }, [activeLayerId, activeConfig, dispatch, entry.id, warpNode, onSelectionChange]);
 
     return { handleMouseDown, handleSelectionMouseDown, handleFrameMouseDown, handleWarpPinMouseDown, isPanning, visualFrame, visualLayerPos, visualPins };
 };

@@ -29,6 +29,8 @@ const LayoutEditor: React.FC<LayoutEditorProps> = ({ nodeOutputs }) => {
     const currentAnim = animations.find(a => a.id === activeAnimationId);
     
     const [transform, setTransform] = useState({ x: 100, y: 100, scale: 1 });
+    const transformRef = useRef(transform);
+    useEffect(() => { transformRef.current = transform; }, [transform]);
     const animIdRef = useRef<string | null>(null);
 
     // Sync state
@@ -133,14 +135,19 @@ const LayoutEditor: React.FC<LayoutEditorProps> = ({ nodeOutputs }) => {
     const getWorldPos = (e: React.MouseEvent | MouseEvent) => {
         const rect = containerRef.current?.getBoundingClientRect();
         if(!rect) return {x:0, y:0};
+        const currentTransform = transformRef.current;
         return {
-            x: (e.clientX - rect.left - transform.x) / transform.scale,
-            y: (e.clientY - rect.top - transform.y) / transform.scale
+            x: (e.clientX - rect.left - currentTransform.x) / currentTransform.scale,
+            y: (e.clientY - rect.top - currentTransform.y) / currentTransform.scale
         };
     };
 
     const handleBoxDown = useCallback((e: React.MouseEvent, id: string | number, handle?: string) => {
-        if (e.button === 1 || e.shiftKey) return; 
+        if (e.button === 1 || e.shiftKey) {
+            dragRef.current = { mode: 'pan', startX: e.clientX, startY: e.clientY };
+            return;
+        }
+        e.stopPropagation();
         if (localTool !== 'select') return;
         
         dispatch({ type: 'SELECT_LAYOUT_ELEMENT', payload: String(id) });
@@ -183,15 +190,14 @@ const LayoutEditor: React.FC<LayoutEditorProps> = ({ nodeOutputs }) => {
         const dy = e.clientY - startY;
         
         if (mode === 'pan') {
-            const newTransform = { ...transform, x: transform.x + dx, y: transform.y + dy };
-            setTransform(newTransform);
+            setTransform(prev => ({ ...prev, x: prev.x + dx, y: prev.y + dy }));
             dragRef.current.startX = e.clientX;
             dragRef.current.startY = e.clientY;
             return;
         }
 
-        const wDx = dx / transform.scale;
-        const wDy = dy / transform.scale;
+        const wDx = dx / transformRef.current.scale;
+        const wDy = dy / transformRef.current.scale;
 
         if (mode === 'move' && initialRect) {
             setVisualRect({ x: Math.round(initialRect.x + wDx), y: Math.round(initialRect.y + wDy), w: initialRect.w, h: initialRect.h });
@@ -215,7 +221,7 @@ const LayoutEditor: React.FC<LayoutEditorProps> = ({ nodeOutputs }) => {
             const h = Math.abs(currentPos.y - initialCursor.y);
             setTempCreateRect({ x: Math.round(x), y: Math.round(y), w: Math.round(w), h: Math.round(h) });
         }
-    }, [transform]);
+    }, []);
 
     const handleWindowUp = useCallback(() => {
         if (!dragRef.current || !currentAnim) { dragRef.current = null; return; }
@@ -232,13 +238,13 @@ const LayoutEditor: React.FC<LayoutEditorProps> = ({ nodeOutputs }) => {
             }
         }
         else if (mode === 'pan') {
-            dispatch({ type: 'UPDATE_LAYOUT_CAMERA', payload: { animId: currentAnim.id, transform } });
+            dispatch({ type: 'UPDATE_LAYOUT_CAMERA', payload: { animId: currentAnim.id, transform: transformRef.current } });
         }
 
         dragRef.current = null;
         setVisualRect(null);
         setTempCreateRect(null);
-    }, [currentAnim, visualRect, tempCreateRect, dispatch, transform]);
+    }, [currentAnim, visualRect, tempCreateRect, dispatch]);
 
     useEffect(() => {
         window.addEventListener('mousemove', handleWindowMove);

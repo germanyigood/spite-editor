@@ -25,6 +25,9 @@ const VideoProcessorModal: React.FC<VideoProcessorModalProps> = ({ file, onConfi
   const timelineRef = useRef<HTMLDivElement>(null);
   const rafRef = useRef<number | null>(null);
   
+  const isSeeking = useRef(false);
+  const pendingTime = useRef<number | null>(null);
+  
   const [videoUrl, setVideoUrl] = useState<string>('');
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
@@ -240,11 +243,30 @@ const VideoProcessorModal: React.FC<VideoProcessorModalProps> = ({ file, onConfi
     
     if (type === 'playhead') {
         setCurrentTime(time);
-        if (videoRef.current) videoRef.current.currentTime = time;
+        if (videoRef.current) {
+            if (!isSeeking.current) {
+                isSeeking.current = true;
+                videoRef.current.currentTime = time;
+            } else {
+                pendingTime.current = time;
+            }
+        }
     } else if (id) {
         setActiveSegmentId(id);
     }
   };
+
+  const handleSeeked = useCallback(() => {
+      isSeeking.current = false;
+      if (pendingTime.current !== null) {
+          const timeToSeek = pendingTime.current;
+          pendingTime.current = null;
+          if (videoRef.current) {
+              isSeeking.current = true;
+              videoRef.current.currentTime = timeToSeek;
+          }
+      }
+  }, []);
 
   const handleGlobalMove = useCallback((e: MouseEvent) => {
     if (!timelineDrag) return;
@@ -259,7 +281,14 @@ const VideoProcessorModal: React.FC<VideoProcessorModalProps> = ({ file, onConfi
 
         if (timelineDrag.type === 'playhead') {
             setCurrentTime(time);
-            if (videoRef.current) videoRef.current.currentTime = time;
+            if (videoRef.current) {
+                if (!isSeeking.current) {
+                    isSeeking.current = true;
+                    videoRef.current.currentTime = time;
+                } else {
+                    pendingTime.current = time;
+                }
+            }
         } 
         else if (timelineDrag.id) {
             setSegments(prev => prev.map(s => {
@@ -461,9 +490,10 @@ const VideoProcessorModal: React.FC<VideoProcessorModalProps> = ({ file, onConfi
                <div ref={videoContainerRef} className="flex-1 relative bg-black flex items-center justify-center overflow-hidden">
                    <video 
                       ref={videoRef}
-                      src={videoUrl}
+                      src={videoUrl || undefined}
                       onLoadedMetadata={handleMetadata}
                       onTimeUpdate={handleTimeUpdate}
+                      onSeeked={handleSeeked}
                       className="max-w-full max-h-full object-contain"
                       onEnded={() => { /* Loop handles playback now */ }}
                       muted

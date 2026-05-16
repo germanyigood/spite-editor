@@ -40,7 +40,7 @@ const LayerListPanel: React.FC<LayerListPanelProps> = ({
                     `}
                 >
                     <div className="w-10 h-10 rounded-lg bg-black/10 dark:bg-black/50 border border-border-base/10 overflow-hidden shrink-0 flex items-center justify-center checkerboard shadow-inner">
-                        <img src={layer.imageSrc} className="w-full h-full object-contain" alt="layer" />
+                        <img src={layer.imageSrc || undefined} className="w-full h-full object-contain" alt="layer" />
                     </div>
                     <span className={`truncate flex-1 font-medium text-xs ${activeLayerId === layer.id ? 'text-txt-primary' : 'text-txt-secondary group-hover:text-txt-primary'}`}>{layer.name}</span>
                     <button 

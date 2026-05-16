@@ -8,7 +8,7 @@ export const SourceNode = ({ node }: { node: SourceNodeType }) => {
     return (
         <div className="w-full h-full relative group">
             <img 
-                src={node.data.src} 
+                src={node.data.src || undefined} 
                 className="block pointer-events-none select-none" 
                 style={{ width: '100%', height: '100%', objectFit: 'fill' }}
                 alt="layer source" 

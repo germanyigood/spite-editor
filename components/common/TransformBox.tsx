@@ -69,6 +69,7 @@ export const TransformBox = memo(({
                 pointerEvents: 'auto'
             }}
             onMouseDown={(e) => {
+                if (e.button === 1) return; // Allow middle click to bubble up for panning
                 e.stopPropagation();
                 onMouseDown(e, id, undefined);
             }}

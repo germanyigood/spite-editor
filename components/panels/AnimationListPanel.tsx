@@ -43,7 +43,7 @@ const AnimationListPanel: React.FC<AnimationListPanelProps> = ({
     <div className="space-y-3 pb-10">
       <div className="flex items-center justify-between text-txt-muted text-[10px] uppercase tracking-wider font-bold px-1 mb-2">
         <div className="flex items-center gap-2">Animations</div>
-        <button onClick={onAdd} title="Add Animation" className="text-indigo-400 hover:text-indigo-300 p-1.5 hover:bg-surface/20 rounded-md transition-colors"><Plus size={14} /></button>
+        <button data-testid="add-animation-btn" onClick={onAdd} title="Add Animation" className="text-indigo-400 hover:text-indigo-300 p-1.5 hover:bg-surface/20 rounded-md transition-colors"><Plus size={14} /></button>
       </div>
       
       <div className="space-y-1">
@@ -61,12 +61,12 @@ const AnimationListPanel: React.FC<AnimationListPanelProps> = ({
                  <div className="flex-1 min-w-0 flex items-center gap-2">
                     {isActive ? <ChevronDown size={14} className="text-indigo-500 shrink-0"/> : <ChevronRight size={14} className="text-txt-muted shrink-0"/>}
                     {renamingId === anim.id ? (
-                        <input autoFocus defaultValue={anim.name} onBlur={(e) => { onUpdateName(anim.id, e.target.value); setRenamingId(null); }}
+                        <input autoFocus defaultValue={anim.name} data-testid="anim-rename-input" onBlur={(e) => { onUpdateName(anim.id, e.target.value); setRenamingId(null); }}
                           onKeyDown={(e) => { if(e.key === 'Enter') { onUpdateName(anim.id, (e.target as any).value); setRenamingId(null); } }}
                           className="bg-surface/80 text-xs w-full border border-indigo-500 rounded px-1.5 py-0.5 outline-none text-txt-primary"
                         />
                     ) : (
-                        <span className="text-xs font-semibold truncate">{anim.name}</span>
+                        <span className="text-xs font-semibold truncate" data-testid="anim-item-name">{anim.name}</span>
                     )}
                  </div>
                  <button onClick={(e) => { e.stopPropagation(); onRemove(anim.id); }} className="text-txt-muted hover:text-red-500 p-1 opacity-0 group-hover:opacity-100"><X size={12} /></button>

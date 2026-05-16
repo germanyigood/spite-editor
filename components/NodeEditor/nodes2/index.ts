@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { NodeType, NodeData, NodeIOSchema, Connection } from '../../types';
+import { NodeType, NodeData, NodeIOSchema, Connection } from '../../../types';
 import { LucideIcon } from 'lucide-react';
 
 import { SourceBundle } from './SourceNode';

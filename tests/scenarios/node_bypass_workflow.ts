@@ -19,10 +19,10 @@ export const node_bypass_workflow: E2EScenario = {
             name: 'Add Chroma Node',
             action: async () => {
                 // Right click on the canvas to open Context Menu
-                const graphContainer = await Simulator.waitFor('.react-transform-component, .handle');
+                const graphContainer = await Simulator.waitFor('[data-testid="node-graph-bg"]');
                 await Simulator.rightClick(document.body, 400, 400); // Trigger graph background context menu
                 // Need to find the menu item
-                const chromaOption = await Simulator.waitFor('div:has-text("Chroma Key")');
+                const chromaOption = await Simulator.waitForText('Chroma Key');
                 await Simulator.click(chromaOption);
             }
         },

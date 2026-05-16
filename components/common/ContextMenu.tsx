@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { CircuitBoard, Scissors, Lightbulb, Film, MonitorUp, Crop, Cable, Grid3X3, Palette, Scaling, Gauge, CircleDashed, Layers, Sparkles, LucideIcon, ImagePlus, PaintBucket, Brush } from 'lucide-react';
-import { NodeType } from '../../../types';
+import { NodeType } from '../../types';
 
 interface ContextMenuProps {
     x: number;

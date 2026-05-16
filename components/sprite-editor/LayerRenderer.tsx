@@ -31,20 +31,35 @@ export const LayerRenderer = React.memo(({
     const warpNode = useMemo(() => findModifierByType(graph, layer.id, 'warp') as WarpNode | undefined, [graph, layer.id]);
     const lastModifier = useMemo(() => findLastModifier(graph, layer.id), [graph, layer.id]);
     
-    const finalPayload = lastModifier ? nodeOutputs[lastModifier.id] : nodeOutputs[layer.id];
+    const paintInputNodeId = useMemo(() => {
+        if (!paintNode || !graph.connections) return layer.id;
+        const conn = graph.connections.find(c => c.target === paintNode.id);
+        return conn ? conn.source : layer.id;
+    }, [graph.connections, paintNode, layer.id]);
+
+    const finalPayload = useMemo(() => {
+        if (toolMode === 'draw') {
+             if (paintNode) return nodeOutputs[paintNode.id] || nodeOutputs[paintInputNodeId] || nodeOutputs[layer.id];
+             return nodeOutputs[paintInputNodeId] || nodeOutputs[layer.id];
+        }
+        return lastModifier ? nodeOutputs[lastModifier.id] : nodeOutputs[layer.id];
+    }, [toolMode, paintNode, paintInputNodeId, nodeOutputs, layer.id, lastModifier]);
     const canInteractWithBrush = toolMode === 'draw' && isSelected && (drawTool === 'brush' || drawTool === 'eraser') && paintNode && !paintNode.disabled;
-    
+
+    const paintInputPayload = nodeOutputs[paintInputNodeId] || nodeOutputs[layer.id];
+
     const { 
         isPointerDown, 
         handlePointerDown, 
         handlePointerMove, 
         handlePointerUp,
-        paintCanvasRef
+        paintCanvasRef,
+        drawTrigger
     } = useDrawingEngine({
         layer,
         paintNode,
         warpNode,
-        nodeOutputs,
+        paintInputPayload,
         canvasRef, // Передаем реф напрямую, чтобы движок мог рисовать в этот элемент
         dispatch,
         animId: state.activeAnimationId
@@ -58,20 +73,8 @@ export const LayerRenderer = React.memo(({
 
         // Если идет активное рисование, мы НЕ затираем холст через React-апдейты,
         // так как движок сам управляет отрисовкой кругов в реальном времени.
-        if (isPointerDown && canInteractWithBrush) return;
-
-        if (canInteractWithBrush) {
-            const drawW = paintCanvasRef.current.width;
-            const drawH = paintCanvasRef.current.height;
-            if (canvas.width !== drawW || canvas.height !== drawH) {
-                canvas.width = drawW;
-                canvas.height = drawH;
-            }
-            ctx.imageSmoothingEnabled = false;
-            ctx.globalCompositeOperation = 'copy';
-            ctx.drawImage(paintCanvasRef.current, 0, 0);
-            return;
-        }
+        const shouldShowPaintCanvas = toolMode === 'draw' && isSelected && paintNode && !paintNode.disabled;
+        if (isPointerDown && shouldShowPaintCanvas) return;
 
         const displayW = finalPayload?.type === 'IMAGE' ? finalPayload.width : layer.data.width;
         const displayH = finalPayload?.type === 'IMAGE' ? finalPayload.height : layer.data.height;
@@ -84,18 +87,28 @@ export const LayerRenderer = React.memo(({
         ctx.imageSmoothingEnabled = false;
         ctx.globalCompositeOperation = 'copy';
 
-        if (finalPayload && finalPayload.type === 'IMAGE' && finalPayload.image instanceof ImageBitmap) {
+        let didDraw = false;
+
+        if (shouldShowPaintCanvas && paintCanvasRef.current) {
+            ctx.drawImage(paintCanvasRef.current, 0, 0);
+            didDraw = true;
+        }
+
+        if (!didDraw && finalPayload && finalPayload.type === 'IMAGE' && finalPayload.image && (finalPayload.image instanceof ImageBitmap || finalPayload.image instanceof HTMLCanvasElement || finalPayload.image instanceof HTMLImageElement)) {
             ctx.drawImage(finalPayload.image, 0, 0);
-        } else {
-            loadBitmap(layer.data.src).then(bmp => {
-                if (!canInteractWithBrush) ctx.drawImage(bmp, 0, 0);
+            didDraw = true;
+        } 
+        
+        if (!didDraw) {
+            loadBitmap((finalPayload as any)?.src || layer.data.src).then(bmp => {
+                if (!canInteractWithBrush && !shouldShowPaintCanvas) ctx.drawImage(bmp, 0, 0);
             }).catch(() => {});
         }
-    }, [finalPayload, layer.data.src, layer.data.width, layer.data.height, canInteractWithBrush, paintCanvasRef, isPointerDown]);
+    }, [finalPayload, layer.data.src, layer.data.width, layer.data.height, canInteractWithBrush, paintCanvasRef, isPointerDown, toolMode, isSelected, paintNode, drawTrigger]);
 
     useEffect(() => {
         redraw();
-    }, [redraw, finalPayload]);
+    }, [redraw, finalPayload, drawTrigger]);
 
     const finalX = overridePos ? overridePos.x : (layer.data?.x || 0);
     const finalY = overridePos ? overridePos.y : (layer.data?.y || 0);

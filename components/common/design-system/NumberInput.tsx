@@ -20,11 +20,14 @@ export const NumberInput = memo(({
   // Safe init: ensure value is never null/undefined
   const safeValue = isNaN(value) || value === null || value === undefined ? 0 : value;
   const [localValue, setLocalValue] = useState<string>(String(safeValue));
+  const [isFocused, setIsFocused] = useState(false);
   const colors = getAccentColors(accent);
 
   useEffect(() => {
-    setLocalValue(String(safeValue));
-  }, [safeValue]);
+    if (!isFocused) {
+      setLocalValue(String(safeValue));
+    }
+  }, [safeValue, isFocused]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -45,6 +48,8 @@ export const NumberInput = memo(({
         value={localValue}
         min={min} max={max} step={step}
         onChange={(e) => setLocalValue(e.target.value)}
+        onFocus={() => setIsFocused(true)}
+        onBlur={() => setIsFocused(false)}
         className={`w-full bg-surface/40 border border-border-base/10 rounded px-2 py-1.5 text-xs text-txt-primary font-mono outline-none transition-all focus:bg-surface/60 focus:ring-1 ${colors.border} ${colors.ring}`}
         onMouseDown={(e) => e.stopPropagation()}
       />

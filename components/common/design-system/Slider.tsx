@@ -20,11 +20,14 @@ export const Slider = memo(({
   // Safe init
   const safeValue = isNaN(value) || value === null || value === undefined ? min : value;
   const [localValue, setLocalValue] = useState(safeValue);
+  const [isInteracting, setIsInteracting] = useState(false);
   const colors = getAccentColors(accent);
 
   useEffect(() => {
-    setLocalValue(safeValue);
-  }, [safeValue]);
+    if (!isInteracting) {
+      setLocalValue(safeValue);
+    }
+  }, [safeValue, isInteracting]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -46,9 +49,18 @@ export const Slider = memo(({
       <div className="relative w-full h-3 flex items-center">
          <input 
             type="range" 
+            data-testid={`slider-${label?.toLowerCase().replace(/\s+/g, '-')}`}
             min={min} max={max} step={step} 
             value={localValue}
             onChange={(e) => setLocalValue(parseFloat(e.target.value))}
+            onPointerDown={(e) => {
+              setIsInteracting(true);
+              (e.target as HTMLElement).setPointerCapture(e.pointerId);
+            }}
+            onPointerUp={(e) => {
+              setIsInteracting(false);
+              (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+            }}
             className={`w-full h-1 bg-surface-hover/20 rounded-full appearance-none cursor-pointer focus:outline-none ${colors.thumb} transition-all`}
             onMouseDown={(e) => e.stopPropagation()} 
          />

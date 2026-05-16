@@ -7,7 +7,7 @@ interface DrawingEngineProps {
     layer: SourceNode;
     paintNode?: PaintNode;
     warpNode?: WarpNode;
-    nodeOutputs: Record<string, NodePayload | null>;
+    paintInputPayload?: NodePayload | null;
     canvasRef: React.RefObject<HTMLCanvasElement | null>;
     dispatch: any;
     animId: string;
@@ -17,7 +17,7 @@ export const useDrawingEngine = ({
     layer,
     paintNode,
     warpNode,
-    nodeOutputs,
+    paintInputPayload,
     canvasRef,
     dispatch,
     animId
@@ -33,6 +33,8 @@ export const useDrawingEngine = ({
             URL.revokeObjectURL(lastLoadedSrc.current);
         }
     };
+
+    const [drawTrigger, setDrawTrigger] = useState(0);
 
     const performSync = useCallback(() => {
         if (!paintNode) return;
@@ -60,37 +62,83 @@ export const useDrawingEngine = ({
     useEffect(() => {
         const canvas = workingCanvasRef.current;
         const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
-        const w = layer.data.width;
-        const h = layer.data.height;
+        
+        const w = (paintInputPayload?.type === 'IMAGE') ? paintInputPayload.width : layer.data.width;
+        const h = (paintInputPayload?.type === 'IMAGE') ? paintInputPayload.height : layer.data.height;
+
+        let requiresTrigger = false;
 
         if (canvas.width !== w || canvas.height !== h) {
             canvas.width = w;
             canvas.height = h;
+            requiresTrigger = true;
         }
 
-        const inputPayload = nodeOutputs[layer.id];
-        const sourceSrc = paintNode?.data.paintData || (inputPayload?.type === 'IMAGE' ? inputPayload.src : null);
-
-        if (sourceSrc && sourceSrc !== lastLoadedSrc.current) {
-            loadBitmap(sourceSrc).then(bmp => {
+        if (paintNode?.data.paintData) {
+            const sourceSrc = paintNode.data.paintData;
+            if (sourceSrc !== lastLoadedSrc.current) {
+                loadBitmap(sourceSrc).then(bmp => {
+                    ctx.globalCompositeOperation = 'copy';
+                    ctx.drawImage(bmp, 0, 0);
+                    ctx.globalCompositeOperation = 'source-over';
+                    lastLoadedSrc.current = sourceSrc;
+                    setDrawTrigger(t => t + 1);
+                });
+            } else if (requiresTrigger) {
+                 // if width/height changed but sourceSrc is same, it was cleared! We need to forcefully redraw!
+                 // Wait! if sourceSrc is same, it means we didn't reload. So canvas is blank in this specific case.
+                 // We should force load it.
+                 lastLoadedSrc.current = null; // force reload next time, or do it now:
+                 loadBitmap(sourceSrc).then(bmp => {
+                    ctx.globalCompositeOperation = 'copy';
+                    ctx.drawImage(bmp, 0, 0);
+                    ctx.globalCompositeOperation = 'source-over';
+                    lastLoadedSrc.current = sourceSrc;
+                    setDrawTrigger(t => t + 1);
+                });
+            }
+        } else if (paintInputPayload?.type === 'IMAGE') {
+            // Draw directly from ImageBitmap if we don't have paintData yet
+            if (paintInputPayload.image && (paintInputPayload.image instanceof ImageBitmap || paintInputPayload.image instanceof HTMLImageElement || paintInputPayload.image instanceof HTMLCanvasElement)) {
                 ctx.globalCompositeOperation = 'copy';
-                ctx.drawImage(bmp, 0, 0);
+                ctx.drawImage(paintInputPayload.image, 0, 0);
                 ctx.globalCompositeOperation = 'source-over';
-                lastLoadedSrc.current = sourceSrc;
-            });
+                // Reset lastLoadedSrc since we are drawing directly from a payload without a specific src
+                revokeLastUrl();
+                lastLoadedSrc.current = null;
+                setDrawTrigger(t => t + 1);
+            } else if (paintInputPayload.src) {
+                if (paintInputPayload.src !== lastLoadedSrc.current || requiresTrigger) {
+                    loadBitmap(paintInputPayload.src).then(bmp => {
+                        ctx.globalCompositeOperation = 'copy';
+                        ctx.drawImage(bmp, 0, 0);
+                        ctx.globalCompositeOperation = 'source-over';
+                        lastLoadedSrc.current = paintInputPayload.src;
+                        setDrawTrigger(t => t + 1);
+                    });
+                }
+            }
         }
         
         return () => revokeLastUrl();
-    }, [layer.id, paintNode?.id, nodeOutputs[layer.id]]);
+    }, [layer.id, paintNode?.id, paintNode?.data.paintData, paintInputPayload, layer.data.width, layer.data.height]);
 
     const getCoords = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
         const rect = e.currentTarget.getBoundingClientRect();
         const rx = (e.clientX - rect.left) / rect.width;
         const ry = (e.clientY - rect.top) / rect.height;
 
-        let texX = rx * layer.data.width;
-        let texY = ry * layer.data.height;
+        const w = (paintInputPayload?.type === 'IMAGE') ? paintInputPayload.width : layer.data.width;
+        const h = (paintInputPayload?.type === 'IMAGE') ? paintInputPayload.height : layer.data.height;
 
+        let texX = rx * w;
+        let texY = ry * h;
+
+        // Note: If warp is BEFORE paint, paintInputPayload already reflects the warp. 
+        // We only inverse-warp if warp is AFTER paint and we are somehow drawing in source space.
+        // Actually, if we are painting, we paint on the direct source of the paint node.
+        // The warping of the cursor should only happen if we are mapping from target space back to paint space (which is rare, because LayerRenderer displays the paint canvas as-is).
+        // Let's assume user is interacting directly with the displayed paint layer boundaries.
         if (warpNode && warpNode.data.pins && !warpNode.disabled) {
             const tw = warpNode.data.targetWidth || layer.data.width;
             const th = warpNode.data.targetHeight || layer.data.height;
@@ -164,6 +212,7 @@ export const useDrawingEngine = ({
         handlePointerDown,
         handlePointerMove,
         handlePointerUp,
-        paintCanvasRef: workingCanvasRef
+        paintCanvasRef: workingCanvasRef,
+        drawTrigger
     };
 };

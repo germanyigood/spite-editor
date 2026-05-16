@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
-import { NodePayload } from '../../../types';
+import { NodePayload } from '../../types';
 import { Play, Pause } from 'lucide-react';
-import { BitmapView } from '../../common/BitmapView';
+import { BitmapView } from './BitmapView';
 
 export const OutputPreview = React.memo(({ input, label = "Preview" }: { input?: NodePayload, label?: string }) => {
     const isTimeline = input?.type === 'TIMELINE';

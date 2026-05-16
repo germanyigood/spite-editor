@@ -18,11 +18,14 @@ export const TextInput = memo(({
   // Safe init
   const safeValue = value || "";
   const [localValue, setLocalValue] = useState(safeValue);
+  const [isFocused, setIsFocused] = useState(false);
   const colors = getAccentColors(accent);
 
   useEffect(() => {
-    setLocalValue(safeValue);
-  }, [safeValue]);
+    if (!isFocused) {
+      setLocalValue(safeValue);
+    }
+  }, [safeValue, isFocused]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -41,6 +44,8 @@ export const TextInput = memo(({
         value={localValue}
         placeholder={placeholder}
         onChange={(e) => setLocalValue(e.target.value)}
+        onFocus={() => setIsFocused(true)}
+        onBlur={() => setIsFocused(false)}
         className={`w-full bg-surface/40 border border-border-base/10 rounded px-2 py-1.5 text-xs text-txt-primary outline-none transition-all focus:bg-surface/60 focus:ring-1 ${colors.border} ${colors.ring}`}
         onMouseDown={(e) => e.stopPropagation()}
       />

@@ -358,6 +358,7 @@ const Timeline: React.FC<TimelineProps> = ({ generatedFrames, nodeOutputs }) => 
             <div className="h-4 w-px bg-border-base/10" />
 
             <button 
+                data-testid="timeline-play-pause"
                 onClick={() => updateTimeline({ isPlaying: !activeTimelineNode?.data.isPlaying })}
                 disabled={!activeTimelineNode}
                 className={`p-1.5 rounded transition-all flex items-center gap-2 text-xs font-bold px-3 border ${activeTimelineNode?.data.isPlaying ? 'bg-green-500/20 text-green-500 border-green-500/30' : 'bg-surface hover:bg-surface-hover/10 text-txt-secondary border-transparent'}`}

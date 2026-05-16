@@ -63,7 +63,7 @@ const stitchBitmapsToBlob = async (frames: ImageSource[], optConfig?: OptimizeCo
     return await createPngBlob(c, optConfig);
 };
 
-export const processGraphHeadless = async (nodes: NodeData[], connections: Connection[]) => {
+export const processGraphHeadless = async (nodes: NodeData[], connections: Connection[], ctxMock?: any) => {
     const out: Record<string, NodePayload | null> = {};
     
     // 1. Deterministic Order
@@ -102,7 +102,7 @@ export const processGraphHeadless = async (nodes: NodeData[], connections: Conne
         if (processor) {
             try {
                 // Force sync if possible, but processors are async
-                out[nodeId] = await processor(node, inputs, { loadBitmap, isCancelled: () => false });
+                out[nodeId] = await processor(node, inputs, ctxMock || { loadBitmap, isCancelled: () => false });
             } catch (e) {
                 console.error(`Export processing failed at ${nodeId}`, e);
                 out[nodeId] = null;

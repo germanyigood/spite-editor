@@ -18,10 +18,13 @@ export const ColorPicker = memo(({
   const colors = getAccentColors(accent);
   const safeValue = value || "#000000";
   const [inputValue, setInputValue] = useState(safeValue);
+  const [isFocused, setIsFocused] = useState(false);
 
   useEffect(() => {
-    setInputValue(safeValue);
-  }, [safeValue]);
+    if (!isFocused) {
+      setInputValue(safeValue);
+    }
+  }, [safeValue, isFocused]);
 
   const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
@@ -57,6 +60,8 @@ export const ColorPicker = memo(({
           data-testid="color-hex-input"
           value={inputValue}
           onChange={handleTextChange}
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => setIsFocused(false)}
           className={`flex-1 min-w-0 bg-surface/40 border border-border-base/10 rounded px-2 py-1.5 text-[10px] text-txt-primary font-mono outline-none focus:ring-1 ${colors.border} ${colors.ring}`}
           placeholder="#000000"
           onMouseDown={(e) => e.stopPropagation()}

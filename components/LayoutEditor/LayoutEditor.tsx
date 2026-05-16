@@ -3,7 +3,7 @@ import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react'
 import { InfiniteCanvas } from '../common/InfiniteCanvas';
 import { useProject } from '../../context/ProjectContext';
 import { BitmapView } from '../common/BitmapView';
-import { NodePayload, PayloadTimeline } from '../../types';
+import { NodePayload, PayloadTimeline, ImageSource } from '../../types';
 import { TransformBox, TransformRect } from '../common/TransformBox';
 import { BoxSelect, Square, Maximize } from 'lucide-react';
 
@@ -60,7 +60,7 @@ const LayoutEditor: React.FC<LayoutEditorProps> = ({ nodeOutputs }) => {
         
         let width = 800;
         let height = 600;
-        let image: ImageBitmap | string | null = null;
+        let image: ImageSource | null = null;
         let isPlaying = false;
         let fps = 12;
         let totalFrames = 1;

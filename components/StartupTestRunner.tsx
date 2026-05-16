@@ -18,6 +18,9 @@ import { defineTopologySpecs } from '../tests/topology.spec';
 import { defineSyncSpecs } from '../tests/sync.spec';
 import { defineDrawSpecs } from '../tests/draw.spec';
 import { definePixelizeSpecs } from '../tests/pixelize.spec';
+import { defineGridMissingSpecs } from '../tests/gridMissing.spec';
+import { defineHeadlessBypassSpecs } from '../tests/headlessBypass.spec';
+import { defineInputsSpecs } from '../tests/inputs.spec';
 
 let testStatus: 'loading' | 'running' | 'success' | 'failure' = 'loading';
 let testStats = { total: 0, passed: 0, failed: 0 };
@@ -95,7 +98,8 @@ const initializeTests = () => {
         defineNormalMapSpecs(); defineProjectSpecs(); defineTimelineSpecs();
         definePerformanceSpecs(); defineVideoSpecs(); defineSwitcherSpecs();
         defineLayoutSpecs(); defineTopologySpecs(); defineSyncSpecs();
-        defineDrawSpecs(); definePixelizeSpecs();
+        defineDrawSpecs(); definePixelizeSpecs(); defineGridMissingSpecs();
+        defineHeadlessBypassSpecs(); defineInputsSpecs();
         window.__specsDefined = true;
     }
 
@@ -163,10 +167,12 @@ const StartupTestRunner: React.FC<StartupTestRunnerProps> = ({ onOpenDebug }) =>
 
   useEffect(() => {
     if (status === 'success') {
-      const timer = setTimeout(() => setIsVisible(false), 3000);
+      const timer = setTimeout(() => setIsVisible(false), 1000);
       return () => clearTimeout(timer);
     }
   }, [status]);
+
+  if (!isVisible) return null;
 
   return (
     <div className={`fixed bottom-4 right-4 z-[100] max-w-sm w-full animate-in slide-in-from-right-10 duration-500`}>

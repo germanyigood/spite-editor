@@ -12,6 +12,9 @@ export const loadImage = (src: string): Promise<HTMLImageElement> => new Promise
 
 export const loadBitmap = async (src: ImageSource): Promise<ImageBitmap> => {
     if (src instanceof ImageBitmap) return src;
+    if (src instanceof HTMLCanvasElement || src instanceof HTMLImageElement) {
+        return createImageBitmap(src);
+    }
     return new Promise((resolve, reject) => {
         const img = new Image();
         img.crossOrigin = "anonymous";
@@ -20,7 +23,7 @@ export const loadBitmap = async (src: ImageSource): Promise<ImageBitmap> => {
             const preview = typeof src === 'string' ? (src.length > 50 ? src.substring(0, 50) + '...' : src) : 'Binary/Blob';
             reject(new Error(`Failed to load bitmap from source: ${preview}`));
         };
-        img.src = src;
+        img.src = src as string;
     });
 };
 

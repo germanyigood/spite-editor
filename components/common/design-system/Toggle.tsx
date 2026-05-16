@@ -30,6 +30,7 @@ export const Toggle = memo(({
         
         {/* Right Side: Switch Button */}
         <button 
+            data-testid={`toggle-${label?.toLowerCase().replace(/\s+/g, '-')}`}
             onClick={(e) => { e.stopPropagation(); onChange(!value); }}
             className={`w-10 h-5 rounded-full relative transition-colors border border-transparent flex-shrink-0
                 ${value ? `${colors.bg}/20 border-${accent}-500/50` : 'bg-surface-hover/10'}

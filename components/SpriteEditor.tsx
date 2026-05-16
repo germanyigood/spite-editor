@@ -96,12 +96,11 @@ const SpriteEditor: React.FC<SpriteEditorProps> = ({ nodeOutputs = {}, style, cl
   const performExtraction = useCallback(async (isCut: boolean) => {
       if (!selectionRect || !activeSource || !entry || !paintNode) return;
       
-      const lastMod = findLastModifier(entry.nodeGraph, activeSource.id);
-      const payload = nodeOutputs[lastMod?.id || activeSource.id];
+      const payload = nodeOutputs[paintNode.id] || nodeOutputs[activeSource.id];
       if (!payload || payload.type !== 'IMAGE') return;
 
       try {
-          const bmp = await loadBitmap(payload.image);
+          const bmp = await loadBitmap(payload.image || payload.src!);
           const layerX = activeSource.data.x || 0;
           const layerY = activeSource.data.y || 0;
           const relX = selectionRect.x - layerX;
@@ -141,13 +140,28 @@ const SpriteEditor: React.FC<SpriteEditorProps> = ({ nodeOutputs = {}, style, cl
               pCanvas.height = activeSource.data.height;
               const pCtx = pCanvas.getContext('2d')!;
               
-              // FIX: If no paintData exists yet, load the ORIGINAL SOURCE first.
-              // Otherwise we are cutting a hole in a transparent canvas, and the layer disappears.
-              const baseSrc = paintNode.data.paintData || activeSource.data.src;
-              
-              if (baseSrc) {
-                  const baseBmp = await loadBitmap(baseSrc);
+              if (paintNode.data.paintData) {
+                  const baseBmp = await loadBitmap(paintNode.data.paintData);
                   pCtx.drawImage(baseBmp, 0, 0);
+              } else {
+                  // Find the input to Paint node to cut from instead of the raw original source
+                  const paintInputNodeId = (() => {
+                      const conn = entry.nodeGraph.connections.find(c => c.target === paintNode.id);
+                      return conn ? conn.source : activeSource.id;
+                  })();
+                  const paintInputPayload = nodeOutputs[paintInputNodeId] || nodeOutputs[activeSource.id];
+                  
+                  if (paintInputPayload && paintInputPayload.type === 'IMAGE') {
+                      if (paintInputPayload.image instanceof ImageBitmap || paintInputPayload.image instanceof HTMLImageElement || paintInputPayload.image instanceof HTMLCanvasElement) {
+                          pCtx.drawImage(paintInputPayload.image, 0, 0);
+                      } else if (paintInputPayload.src) {
+                          const baseBmp = await loadBitmap(paintInputPayload.src);
+                          pCtx.drawImage(baseBmp, 0, 0);
+                      }
+                  } else if (activeSource.data.src) {
+                      const baseBmp = await loadBitmap(activeSource.data.src);
+                      pCtx.drawImage(baseBmp, 0, 0);
+                  }
               }
               
               pCtx.clearRect(safeX, safeY, safeW, safeH);
@@ -241,9 +255,9 @@ const SpriteEditor: React.FC<SpriteEditorProps> = ({ nodeOutputs = {}, style, cl
         {toolMode === 'draw' && (
             <div className="absolute bottom-10 left-1/2 -translate-x-1/2 flex items-center gap-2 p-2 bg-panel/90 backdrop-blur-2xl rounded-2xl border border-white/10 shadow-2xl z-[100] animate-in slide-in-from-bottom-5">
                 <div className="flex bg-surface/50 p-1 rounded-xl gap-1">
-                    <button onClick={() => setLocalDrawTool('brush')} className={`p-2 rounded-lg transition-all ${drawTool === 'brush' ? 'bg-pink-600 text-white shadow-lg' : 'text-txt-secondary hover:text-white'}`} title="Brush Tool (B)"><Brush size={18} /></button>
-                    <button onClick={() => setLocalDrawTool('eraser')} className={`p-2 rounded-lg transition-all ${drawTool === 'eraser' ? 'bg-red-600 text-white shadow-lg shadow-red-900/40' : 'text-txt-secondary hover:text-white'}`} title="Eraser Tool (E)"><Eraser size={18} /></button>
-                    <button onClick={() => setLocalDrawTool('select')} className={`p-2 rounded-lg transition-all ${drawTool === 'select' ? 'bg-indigo-600 text-white shadow-lg' : 'text-txt-secondary hover:text-white'}`} title="Selection Tool (S)"><BoxSelect size={18} /></button>
+                    <button data-testid="draw-tool-brush" onClick={() => setLocalDrawTool('brush')} className={`p-2 rounded-lg transition-all ${drawTool === 'brush' ? 'bg-pink-600 text-white shadow-lg' : 'text-txt-secondary hover:text-white'}`} title="Brush Tool (B)"><Brush size={18} /></button>
+                    <button data-testid="draw-tool-eraser" onClick={() => setLocalDrawTool('eraser')} className={`p-2 rounded-lg transition-all ${drawTool === 'eraser' ? 'bg-red-600 text-white shadow-lg shadow-red-900/40' : 'text-txt-secondary hover:text-white'}`} title="Eraser Tool (E)"><Eraser size={18} /></button>
+                    <button data-testid="draw-tool-select" onClick={() => setLocalDrawTool('select')} className={`p-2 rounded-lg transition-all ${drawTool === 'select' ? 'bg-indigo-600 text-white shadow-lg' : 'text-txt-secondary hover:text-white'}`} title="Selection Tool (S)"><BoxSelect size={18} /></button>
                 </div>
                 
                 {drawTool !== 'select' && (

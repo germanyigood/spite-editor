@@ -348,7 +348,7 @@ export interface NodeIOSchema {
     outputs: Record<string, SocketType | SocketType[]>;
 }
 
-export type ImageSource = ImageBitmap | string;
+export type ImageSource = ImageBitmap | HTMLCanvasElement | HTMLImageElement | string;
 
 // 1. Source / Chroma Output
 export interface PayloadImage {

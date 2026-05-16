@@ -47,7 +47,7 @@ export const Simulator = {
             const elements = Array.from(document.querySelectorAll(tags)) as HTMLElement[];
             const sortedByDepth = elements.sort((a, b) => a.querySelectorAll('*').length - b.querySelectorAll('*').length);
             const found = sortedByDepth.find(el => {
-                const nodeText = el.innerText?.toLowerCase() || (el as HTMLInputElement).value?.toLowerCase() || "";
+                const nodeText = el.textContent?.toLowerCase() || (el as HTMLInputElement).value?.toLowerCase() || "";
                 if (!nodeText.includes(lowerText)) return false;
                 return this.isVisible(el);
             });
@@ -70,6 +70,22 @@ export const Simulator = {
         window.__E2E_CURSOR__?.up();
         el.dispatchEvent(new MouseEvent('mouseup', eventInit));
         el.dispatchEvent(new MouseEvent('click', eventInit));
+        await new Promise(r => setTimeout(r, getDelay()));
+    },
+
+    async rightClick(selectorOrEl: string | HTMLElement, xOffset: number = 0, yOffset: number = 0) {
+        const el = typeof selectorOrEl === 'string' ? await this.waitFor(selectorOrEl) : selectorOrEl;
+        const rect = el.getBoundingClientRect();
+        const x = rect.left + (xOffset || rect.width / 2);
+        const y = rect.top + (yOffset || rect.height / 2);
+        await this.moveCursorTo(x, y);
+        window.__E2E_CURSOR__?.down();
+        const eventInit = { bubbles: true, cancelable: true, view: window, clientX: x, clientY: y, button: 2, buttons: 2 };
+        el.dispatchEvent(new MouseEvent('mousedown', eventInit));
+        await new Promise(r => setTimeout(r, 50));
+        window.__E2E_CURSOR__?.up();
+        el.dispatchEvent(new MouseEvent('mouseup', eventInit));
+        el.dispatchEvent(new MouseEvent('contextmenu', eventInit));
         await new Promise(r => setTimeout(r, getDelay()));
     },
 
@@ -110,6 +126,22 @@ export const Simulator = {
         el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, code: 'Enter' }));
         el.dispatchEvent(new Event('change', { bubbles: true }));
         el.dispatchEvent(new Event('blur', { bubbles: true }));
+        await new Promise(r => setTimeout(r, getDelay()));
+    },
+
+    async setValue(selector: string, value: string | number) {
+        const el = await this.waitFor(selector) as HTMLInputElement;
+        if (typeof el.focus === 'function') el.focus();
+        const rect = el.getBoundingClientRect();
+        await this.moveCursorTo(rect.left + rect.width / 2, rect.top + rect.height / 2);
+        const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")?.set;
+        if (nativeInputValueSetter) {
+            nativeInputValueSetter.call(el, value.toString());
+        } else {
+            el.value = value.toString();
+        }
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        el.dispatchEvent(new Event('change', { bubbles: true }));
         await new Promise(r => setTimeout(r, getDelay()));
     },
 

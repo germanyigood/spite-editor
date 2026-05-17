@@ -17,7 +17,9 @@ export const loadBitmap = async (src: ImageSource): Promise<ImageBitmap> => {
     }
     return new Promise((resolve, reject) => {
         const img = new Image();
-        img.crossOrigin = "anonymous";
+        if (typeof src === 'string' && !src.startsWith('data:') && !src.startsWith('blob:')) {
+            img.crossOrigin = "anonymous";
+        }
         img.onload = () => resolve(createImageBitmap(img));
         img.onerror = () => {
             const preview = typeof src === 'string' ? (src.length > 50 ? src.substring(0, 50) + '...' : src) : 'Binary/Blob';

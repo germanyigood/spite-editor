@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { X, Bug, CheckCircle2, XCircle, Play, Zap, Eye, Loader2, ChevronRight, ChevronDown, Circle, AlertTriangle, Settings2, Square, Terminal, History, SkipForward } from 'lucide-react';
 import { E2EScenario, StepStatus } from './types';
+import { jasmineTestState, subscribeToJasmineTests, UnitTestResult } from '../../../components/StartupTestRunner';
 
 interface DebugUIProps {
   onClose: () => void;
@@ -25,6 +26,15 @@ export const E2EDebugUI: React.FC<DebugUIProps> = ({
     stepState = {}
 }) => {
   const [expandedScenarios, setExpandedScenarios] = useState<Record<string, boolean>>({});
+  const [activeTab, setActiveTab] = useState<'E2E' | 'UNIT'>('E2E');
+  const [unitTestState, setUnitTestState] = useState({ ...jasmineTestState });
+
+  useEffect(() => {
+      const unsub = subscribeToJasmineTests(() => {
+          setUnitTestState({ ...jasmineTestState });
+      });
+      return unsub;
+  }, []);
 
   useEffect(() => {
       if (activeScenarioId) {
@@ -108,11 +118,11 @@ export const E2EDebugUI: React.FC<DebugUIProps> = ({
                     <h3 className="text-xs font-bold uppercase tracking-widest opacity-50">Results</h3>
                     <div className="grid grid-cols-2 gap-2">
                         <div className="p-3 bg-green-500/10 rounded-xl border border-green-500/20">
-                            <div className="text-2xl font-bold text-green-500">{stats.passed}</div>
+                            <div className="text-2xl font-bold text-green-500">{activeTab === 'E2E' ? stats.passed : unitTestState.stats.passed}</div>
                             <div className="text-[10px] uppercase font-bold opacity-60">Passed</div>
                         </div>
                         <div className="p-3 bg-red-500/10 rounded-xl border border-red-500/20">
-                            <div className="text-2xl font-bold text-red-500">{stats.failed}</div>
+                            <div className="text-2xl font-bold text-red-500">{activeTab === 'E2E' ? stats.failed : unitTestState.stats.failed}</div>
                             <div className="text-[10px] uppercase font-bold opacity-60">Failed</div>
                         </div>
                     </div>
@@ -121,11 +131,12 @@ export const E2EDebugUI: React.FC<DebugUIProps> = ({
 
             {/* Scenarios List */}
             <div className="flex-1 flex flex-col min-h-0 bg-white dark:bg-gray-900">
-                <div className="flex px-6 border-b border-border-base/10 bg-gray-50 dark:bg-black/10">
-                    <div className={`px-4 py-3 text-xs font-bold uppercase tracking-widest border-b-2 transition-colors duration-500 ${isRunning ? 'text-blue-500 border-blue-500' : 'text-purple-500 border-purple-500'}`}>App Scenarios</div>
+                <div className="flex px-6 border-b border-border-base/10 bg-gray-50 dark:bg-black/10 gap-4">
+                    <button onClick={() => setActiveTab('E2E')} className={`px-4 py-3 text-xs font-bold uppercase tracking-widest border-b-2 transition-colors duration-500 hover:text-blue-500 ${activeTab === 'E2E' ? (isRunning ? 'text-blue-500 border-blue-500' : 'text-purple-500 border-purple-500') : 'text-txt-muted border-transparent'}`}>App Scenarios</button>
+                    <button onClick={() => setActiveTab('UNIT')} className={`px-4 py-3 text-xs font-bold uppercase tracking-widest border-b-2 transition-colors duration-500 hover:text-blue-500 ${activeTab === 'UNIT' ? (unitTestState.status === 'running' ? 'text-blue-500 border-blue-500' : 'text-purple-500 border-purple-500') : 'text-txt-muted border-transparent'}`}>Unit Tests</button>
                 </div>
                 <div className="flex-1 overflow-y-auto p-6 custom-scrollbar space-y-4">
-                    {scenarios.map((s) => {
+                    {activeTab === 'E2E' ? scenarios.map((s) => {
                         const isExpanded = expandedScenarios[s.id];
                         const scenarioState = stepState[s.id] || { setup: {}, steps: {} };
                         const isActive = activeScenarioId === s.id;
@@ -185,7 +196,33 @@ export const E2EDebugUI: React.FC<DebugUIProps> = ({
                                 )}
                             </div>
                         );
-                    })}
+                    }) : (
+                        <div className="space-y-2">
+                           {unitTestState.results.map((res, i) => (
+                               <div key={i} className={`p-3 rounded-xl border flex flex-col gap-2 ${res.status === 'failed' ? 'bg-red-500/5 border-red-500/20' : 'bg-surface border-border-base/5'}`}>
+                                   <div className="flex items-center gap-3">
+                                       <div className="shrink-0">{getStepIcon(res.status as StepStatus)}</div>
+                                       <span className="text-xs font-bold text-txt-primary">{res.fullName}</span>
+                                   </div>
+                                   {res.failedExpectations?.length > 0 && (
+                                       <div className="ml-6 flex flex-col gap-1">
+                                           {res.failedExpectations.map((err, errIdx) => (
+                                                <div key={errIdx} className="p-2 bg-red-500/10 rounded-lg text-[10px] text-red-400 font-mono border border-red-500/10">
+                                                    <div>ERR: {err.message}</div>
+                                                </div>
+                                           ))}
+                                       </div>
+                                   )}
+                               </div>
+                           ))}
+                           {unitTestState.status === 'running' && (
+                               <div className="flex items-center gap-2 text-txt-muted text-xs p-4"><Loader2 className="animate-spin" size={14}/> Running unit tests...</div>
+                           )}
+                           {unitTestState.results.length === 0 && unitTestState.status !== 'running' && (
+                               <div className="text-txt-muted text-xs p-4 italic">No unit tests recorded or tests failed to initialize.</div>
+                           )}
+                        </div>
+                    )}
                 </div>
             </div>
         </div>

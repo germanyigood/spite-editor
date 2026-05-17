@@ -94,7 +94,7 @@ export const LayerRenderer = React.memo(({
             didDraw = true;
         }
 
-        if (!didDraw && finalPayload && finalPayload.type === 'IMAGE' && finalPayload.image && (finalPayload.image instanceof ImageBitmap || finalPayload.image instanceof HTMLCanvasElement || finalPayload.image instanceof HTMLImageElement)) {
+        if (!didDraw && finalPayload && (finalPayload.type === 'IMAGE' || finalPayload.type === 'IMAGE_SEQUENCE') && finalPayload.image && (finalPayload.image instanceof ImageBitmap || finalPayload.image instanceof HTMLCanvasElement || finalPayload.image instanceof HTMLImageElement)) {
             ctx.drawImage(finalPayload.image, 0, 0);
             didDraw = true;
         } 

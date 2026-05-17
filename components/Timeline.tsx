@@ -4,6 +4,7 @@ import { Trash2, Copy, Play, Pause, ZoomIn, Search, GripHorizontal, ChevronDown,
 import { useProject } from '../context/ProjectContext';
 import { TimelineNode, Frame, ImageSource, NodePayload } from '../types';
 import { BitmapView } from './common/BitmapView';
+import { ContextMenu, ContextMenuConfig } from './common/design-system/ContextMenu';
 
 interface TimelineProps {
   generatedFrames: ImageSource[];
@@ -116,7 +117,7 @@ const Timeline: React.FC<TimelineProps> = ({ generatedFrames, nodeOutputs }) => 
   const scrollRef = useRef<HTMLDivElement>(null);
   const rafRef = useRef<number | null>(null);
 
-  const [contextMenu, setContextMenu] = useState<{ x: number, y: number, index: number } | null>(null);
+  const [contextMenuConfig, setContextMenuConfig] = useState<ContextMenuConfig | null>(null);
   const [isScrubbing, setIsScrubbing] = useState(false);
   
   // Visual Config
@@ -246,12 +247,30 @@ const Timeline: React.FC<TimelineProps> = ({ generatedFrames, nodeOutputs }) => 
   const handleContextMenu = useCallback((e: React.MouseEvent, index: number) => {
       e.preventDefault();
       e.stopPropagation();
-      setContextMenu({ x: e.clientX, y: e.clientY, index });
+      setContextMenuConfig({
+          x: e.clientX,
+          y: e.clientY,
+          header: `Frame ${index}`,
+          items: [
+              {
+                  id: 'duplicate',
+                  label: 'Duplicate',
+                  icon: Copy,
+                  colorClass: 'text-blue-400',
+                  onClick: () => performAction('duplicate', index)
+              },
+              {
+                  id: 'delete',
+                  label: 'Remove',
+                  icon: Trash2,
+                  danger: true,
+                  onClick: () => performAction('delete', index)
+              }
+          ]
+      });
   }, []);
 
-  const performAction = (action: 'duplicate' | 'delete') => {
-      if (contextMenu === null) return;
-      const { index } = contextMenu;
+  const performAction = (action: 'duplicate' | 'delete', index: number) => {
       const newFrames = [...frames];
 
       if (action === 'delete') {
@@ -264,7 +283,7 @@ const Timeline: React.FC<TimelineProps> = ({ generatedFrames, nodeOutputs }) => 
           newFrames.splice(index + 1, 0, frames[index]);
           updateTimeline({ frames: newFrames });
       }
-      setContextMenu(null);
+      setContextMenuConfig(null);
   };
 
   // --- Drag & Drop ---
@@ -322,7 +341,7 @@ const Timeline: React.FC<TimelineProps> = ({ generatedFrames, nodeOutputs }) => 
     <div 
         ref={containerRef}
         className="flex flex-col h-full bg-panel border-t border-border-base/10 select-none relative z-20 shadow-[0_-10px_40px_rgba(0,0,0,0.2)] text-txt-primary"
-        onClick={() => setContextMenu(null)}
+        onClick={() => setContextMenuConfig(null)}
         onMouseLeave={() => setIsScrubbing(false)}
     >
       
@@ -478,30 +497,10 @@ const Timeline: React.FC<TimelineProps> = ({ generatedFrames, nodeOutputs }) => 
           </div>
       </div>
 
-      {/* Context Menu Popover */}
-      {contextMenu && (
-          <div 
-              className="fixed z-50 bg-panel border border-border-base/10 rounded-lg shadow-2xl py-1 w-40 animate-in fade-in zoom-in-95 duration-75"
-              style={{ left: contextMenu.x, top: contextMenu.y }}
-              onMouseLeave={() => setContextMenu(null)}
-          >
-              <div className="px-3 py-1.5 text-[10px] text-txt-muted font-bold uppercase tracking-widest border-b border-border-base/10 mb-1">
-                  Frame {contextMenu.index}
-              </div>
-              <button 
-                  onClick={() => performAction('duplicate')}
-                  className="w-full text-left px-3 py-2 text-xs text-txt-secondary hover:bg-surface/50 hover:text-txt-primary flex items-center gap-2"
-              >
-                  <Copy size={14} className="text-blue-400"/> Duplicate
-              </button>
-              <button 
-                  onClick={() => performAction('delete')}
-                  className="w-full text-left px-3 py-2 text-xs text-txt-secondary hover:bg-red-500/10 hover:text-red-400 flex items-center gap-2"
-              >
-                  <Trash2 size={14} className="text-red-400"/> Remove
-              </button>
-          </div>
-      )}
+      <ContextMenu 
+          config={contextMenuConfig} 
+          onClose={() => setContextMenuConfig(null)} 
+      />
 
     </div>
   );

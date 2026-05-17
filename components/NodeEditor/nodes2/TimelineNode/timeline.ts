@@ -52,13 +52,17 @@ export const processTimeline: NodeProcessor = async (node, inputs, _context) => 
     const frameIndices = node.data.frames || [];
     
     // NORMALIZE INDICES:
-    // node.data.frames contains Global Indices (e.g., 5, 6, 7 from a second grid).
-    // allAvailableFrames contains only Local Frames (e.g., 0, 1, 2 from that same grid).
-    // We shift the requested indices down so the lowest requested index maps to 0.
+    // We map requested indices directly to the available frames. If the request is out of bounds
+    // (e.g. gaps in global indices due to unconnected grids), we gracefully clamp or safely find the frame.
     const minIndex = frameIndices.length > 0 ? Math.min(...frameIndices) : 0;
 
-    frameIndices.forEach(globalIdx => {
-        const localIdx = globalIdx - minIndex;
+    frameIndices.forEach((globalIdx, countIdx) => {
+        let localIdx = globalIdx - minIndex;
+        
+        // If due to gaps (e.g. Grid2 is unconnected) localIdx overshoots, we safely fallback to the raw index count
+        if (localIdx < 0 || localIdx >= allAvailableFrames.length) {
+            localIdx = countIdx % allAvailableFrames.length; 
+        }
         
         if (allAvailableFrames[localIdx]) {
             validFrames.push(allAvailableFrames[localIdx]);

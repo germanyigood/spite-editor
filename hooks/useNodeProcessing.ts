@@ -56,6 +56,24 @@ export const useNodeProcessing = ({ nodes, connections }: UseNodeProcessingProps
                 incomingMap.get(c.target)?.push(c);
             });
 
+            // Map each node to its 'origin' source node index to correctly match getGraphLayers order
+            const originSourceIndex = new Map<string, number>();
+            const sources = nodes.filter(n => n.type === 'source');
+            sources.forEach((src, srcIdx) => {
+                const q = [src.id];
+                const visited = new Set<string>();
+                while (q.length > 0) {
+                    const curr = q.shift()!;
+                    if (visited.has(curr)) continue;
+                    visited.add(curr);
+                    if (!originSourceIndex.has(curr)) {
+                        originSourceIndex.set(curr, srcIdx);
+                    }
+                    const outgoing = connections.filter(c => c.source === curr);
+                    outgoing.forEach(c => q.push(c.target));
+                }
+            });
+
             // --- SEQUENTIAL EXECUTION (Based on Topology) ---
             for (const nodeId of executionOrder) {
                 if (checkCancelled()) return;
@@ -67,11 +85,16 @@ export const useNodeProcessing = ({ nodes, connections }: UseNodeProcessingProps
                 // We strictly look up results from previous steps in this specific run
                 const nodeInputs: Record<string, NodePayload> = {};
                 
-                // CRITICAL FIX: Sort incoming connections based on the source node's position in the node list.
+                // CRITICAL FIX: Sort incoming connections based on the true Source origin.
                 // This ensures that when we aggregate inputs (e.g. in TimelineNode), the order matches 
-                // the "Global Frame Pool" order used by the UI (getGraphLayers), which also follows node list order.
+                // the "Global Frame Pool" order used by the UI (getGraphLayers).
                 const incoming = incomingMap.get(nodeId) || [];
                 incoming.sort((a, b) => {
+                    // 1. Prioritize origin source order
+                    const originA = originSourceIndex.get(a.source) ?? 999;
+                    const originB = originSourceIndex.get(b.source) ?? 999;
+                    if (originA !== originB) return originA - originB;
+                    // 2. Fallback to immediate node index if origin is same or unknown
                     const idxA = nodeIndexMap.get(a.source) ?? -1;
                     const idxB = nodeIndexMap.get(b.source) ?? -1;
                     return idxA - idxB;

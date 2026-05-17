@@ -1,8 +1,8 @@
 
-import React, { useRef, memo, useMemo } from 'react';
+import React, { useRef, memo, useMemo, useState, useEffect } from 'react';
 import { useProject } from '../../context/ProjectContext';
 import { NodeData, Connection, NodePayload, NodeType } from '../../types';
-import { Image as ImageIcon } from 'lucide-react';
+import { Image as ImageIcon, Cable, Trash2, Sparkles, Brush, Grid3X3, CircuitBoard, PaintBucket, ImagePlus, Palette, CircleDashed, Layers, Scissors, Lightbulb, Film, Crop, Scaling, Gauge, MonitorUp } from 'lucide-react';
 
 // Logic & Data
 import { useGraphInteraction } from './hooks/useGraphInteraction';
@@ -11,7 +11,7 @@ import { useGraphInteraction } from './hooks/useGraphInteraction';
 import { NODE_REGISTRY, RegisteredNodeType } from './nodes2';
 
 // UI Components
-import ContextMenu from './common/ContextMenu';
+import { ContextMenu, ContextMenuConfig, ContextMenuEntry } from '../common/design-system/ContextMenu';
 import { NodeWrapper } from './common/NodeWrapper';
 
 interface NodeGraphProps {
@@ -175,6 +175,96 @@ const NodeGraph: React.FC<NodeGraphProps> = ({ visible = true, nodeOutputs }) =>
         return rawNodes;
     }, [rawNodes, localDragOffset, dragState, transform.scale]);
 
+    const contextMenuConfig = useMemo<ContextMenuConfig | null>(() => {
+        if (!contextMenu) return null;
+        
+        const isEdgeAction = !!contextMenu.connectionId;
+        
+        const menuItems: ContextMenuEntry[] = [];
+        
+        if (isEdgeAction) {
+            menuItems.push({
+                id: 'delete_connection',
+                label: 'Delete Wire',
+                icon: Trash2,
+                danger: true,
+                onClick: () => {
+                    handleDeleteConnection(contextMenu.connectionId!);
+                }
+            });
+            menuItems.push({ id: 'sep_1', separator: true });
+        }
+
+        const addNode = (type: NodeType) => {
+            handleAddNode(type);
+        };
+
+        const groups = [
+            [
+                { type: 'generate', label: 'AI Sprite Gen', icon: Sparkles, colorClass: 'text-purple-500 dark:text-purple-400' },
+                { type: 'paint', label: 'Paint', icon: Brush, colorClass: 'text-purple-500 dark:text-purple-400' },
+                { type: 'pixelize', label: 'Smart Pixelize', icon: Grid3X3, colorClass: 'text-cyan-600 dark:text-cyan-400' }
+            ],
+            [
+                { type: 'chroma', label: 'Chroma Key', icon: CircuitBoard, colorClass: 'text-purple-500 dark:text-purple-400' },
+                { type: 'fill_color', label: 'Background Color', icon: PaintBucket, colorClass: 'text-blue-500 dark:text-blue-400' },
+                { type: 'composite', label: 'Composite Image', icon: ImagePlus, colorClass: 'text-blue-500 dark:text-blue-400' },
+                { type: 'color_correct', label: 'Color Correct', icon: Palette, colorClass: 'text-blue-500 dark:text-blue-400' },
+                { type: 'grid', label: 'Slice Grid', icon: Scissors, colorClass: 'text-pink-600 dark:text-pink-400' }
+            ],
+            [
+                { type: 'outline', label: 'Outline', icon: CircleDashed, colorClass: 'text-gray-500 dark:text-gray-400' },
+                { type: 'drop_shadow', label: 'Drop Shadow', icon: Layers, colorClass: 'text-gray-500 dark:text-gray-400' }
+            ],
+            [
+                { type: 'normal_map', label: 'Normal Map', icon: Lightbulb, colorClass: 'text-amber-500 dark:text-amber-400' },
+                { type: 'seamless', label: 'Seamless Tile', icon: Grid3X3, colorClass: 'text-pink-500 dark:text-pink-300' }
+            ],
+            [
+                { type: 'frame_normalize', label: 'Frame Size', icon: Scaling, colorClass: 'text-cyan-600 dark:text-cyan-400' },
+                { type: 'timeline', label: 'Timeline', icon: Film, colorClass: 'text-green-600 dark:text-green-400' },
+                { type: 'crop', label: 'Crop', icon: Crop, colorClass: 'text-orange-600 dark:text-orange-400' },
+                { type: 'resize', label: 'Resize Output', icon: Scaling, colorClass: 'text-cyan-600 dark:text-cyan-400' },
+                { type: 'optimize', label: 'Optimization', icon: Gauge, colorClass: 'text-yellow-600 dark:text-yellow-400' }
+            ]
+        ];
+
+        groups.forEach((group, index) => {
+            if (index > 0 && menuItems.length > 0 && !('separator' in menuItems[menuItems.length - 1])) {
+                menuItems.push({ id: `group_sep_${index}`, separator: true });
+            }
+            group.forEach(item => {
+                menuItems.push({
+                    id: item.type,
+                    label: item.label,
+                    icon: item.icon,
+                    colorClass: item.colorClass,
+                    onClick: () => addNode(item.type as NodeType)
+                });
+            });
+        });
+
+        if (!isEdgeAction) {
+            menuItems.push({ id: 'out_sep', separator: true });
+            menuItems.push({
+                id: 'output',
+                label: 'Output',
+                icon: MonitorUp,
+                colorClass: 'text-blue-500 dark:text-blue-400',
+                onClick: () => addNode('output')
+            });
+        }
+
+        return {
+            x: contextMenu.x,
+            y: contextMenu.y,
+            header: isEdgeAction ? (
+                <><span>Connection</span><Cable size={10} className="text-yellow-500" /></>
+            ) : 'Add Node',
+            items: menuItems
+        };
+    }, [contextMenu, handleAddNode, handleDeleteConnection]);
+
     if (!currentAnim) return null;
 
     return (
@@ -198,16 +288,10 @@ const NodeGraph: React.FC<NodeGraphProps> = ({ visible = true, nodeOutputs }) =>
                  } as any} 
             />
             
-            {contextMenu && (
-                <ContextMenu 
-                    x={contextMenu.x} 
-                    y={contextMenu.y} 
-                    onClose={()=>setContextMenu(null)} 
-                    onAddNode={handleAddNode} 
-                    onDeleteConnection={contextMenu.connectionId ? () => handleDeleteConnection(contextMenu.connectionId!) : undefined}
-                    isEdgeAction={!!contextMenu.connectionId} 
-                />
-            )}
+            <ContextMenu 
+                config={contextMenuConfig} 
+                onClose={() => setContextMenu(null)}
+            />
 
             <div className="w-full h-full origin-top-left" style={{ transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.scale})` }}>
                 <svg className="absolute top-0 left-0 overflow-visible z-0">

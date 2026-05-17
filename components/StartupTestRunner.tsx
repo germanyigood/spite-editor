@@ -22,6 +22,27 @@ import { defineGridMissingSpecs } from '../tests/gridMissing.spec';
 import { defineHeadlessBypassSpecs } from '../tests/headlessBypass.spec';
 import { defineInputsSpecs } from '../tests/inputs.spec';
 
+export interface UnitTestResult {
+  id: string;
+  fullName: string;
+  status: 'passed' | 'failed' | 'pending';
+  failedExpectations: { message: string, stack: string }[];
+}
+
+export const jasmineTestState = {
+    results: [] as UnitTestResult[],
+    status: 'loading' as 'loading' | 'running' | 'success' | 'failure',
+    stats: { total: 0, passed: 0, failed: 0 },
+    listeners: [] as (() => void)[]
+};
+
+export function subscribeToJasmineTests(listener: () => void) {
+    jasmineTestState.listeners.push(listener);
+    return () => {
+        jasmineTestState.listeners = jasmineTestState.listeners.filter(l => l !== listener);
+    };
+}
+
 let testStatus: 'loading' | 'running' | 'success' | 'failure' = 'loading';
 let testStats = { total: 0, passed: 0, failed: 0 };
 let isInitialized = false;
@@ -29,6 +50,7 @@ let updateListeners: (() => void)[] = [];
 
 function notifyListeners() {
   updateListeners.forEach(listener => listener());
+  jasmineTestState.listeners.forEach(listener => listener());
 }
 
 declare global {
@@ -87,6 +109,7 @@ const initializeTests = () => {
     console.log("%c[STARTUP] Running System Self-Diagnostics...", "color: #3b82f6; font-weight: bold;");
 
     testStatus = 'running';
+    jasmineTestState.status = 'running';
     notifyListeners();
 
     const env = window.jasmine.getEnv();
@@ -105,9 +128,19 @@ const initializeTests = () => {
 
     const reporter = {
       specDone: (result: any) => {
+        const testRes: UnitTestResult = {
+            id: result.id,
+            fullName: result.fullName,
+            status: result.status,
+            failedExpectations: result.failedExpectations?.map((f: any) => ({ message: f.message, stack: f.stack })) || []
+        };
+        jasmineTestState.results.push(testRes);
+
         if (result.status === 'failed') {
           testStats.total++;
           testStats.failed++;
+          jasmineTestState.stats.total++;
+          jasmineTestState.stats.failed++;
           
           // LOG INDIVIDUAL FAILURE IMMEDIATELY
           console.groupCollapsed(`%c[UNIT FAIL] ${result.fullName}`, "background: #ef4444; color: white; padding: 2px; font-weight: bold;");
@@ -119,6 +152,8 @@ const initializeTests = () => {
         } else {
           testStats.total++;
           testStats.passed++;
+          jasmineTestState.stats.total++;
+          jasmineTestState.stats.passed++;
         }
         notifyListeners();
       },
@@ -127,9 +162,11 @@ const initializeTests = () => {
         if (result?.overallStatus === 'passed') {
           console.log("%c[STARTUP] All systems nominal.", "color: #10b981; font-weight: bold;");
           testStatus = 'success';
+          jasmineTestState.status = 'success';
         } else {
           console.warn(`%c[STARTUP] Diagnostics complete with ${testStats.failed} failures. See console logs.`, "color: #f59e0b; font-weight: bold;");
           testStatus = 'failure';
+          jasmineTestState.status = 'failure';
         }
         notifyListeners();
       }

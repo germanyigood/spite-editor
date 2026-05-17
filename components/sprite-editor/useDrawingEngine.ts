@@ -27,20 +27,12 @@ export const useDrawingEngine = ({
     const syncTimeoutRef = useRef<any>(null);
     const lastLoadedSrc = useRef<string | null>(null);
 
-    // Очистка старых ссылок для предотвращения утечек памяти
-    const revokeLastUrl = () => {
-        if (lastLoadedSrc.current && lastLoadedSrc.current.startsWith('blob:')) {
-            URL.revokeObjectURL(lastLoadedSrc.current);
-        }
-    };
-
     const [drawTrigger, setDrawTrigger] = useState(0);
 
     const performSync = useCallback(() => {
         if (!paintNode) return;
         workingCanvasRef.current.toBlob((blob) => {
             if (!blob) return;
-            revokeLastUrl();
             const url = URL.createObjectURL(blob);
             lastLoadedSrc.current = url;
             dispatch({
@@ -104,7 +96,6 @@ export const useDrawingEngine = ({
                 ctx.drawImage(paintInputPayload.image, 0, 0);
                 ctx.globalCompositeOperation = 'source-over';
                 // Reset lastLoadedSrc since we are drawing directly from a payload without a specific src
-                revokeLastUrl();
                 lastLoadedSrc.current = null;
                 setDrawTrigger(t => t + 1);
             } else if (paintInputPayload.src) {
@@ -120,7 +111,6 @@ export const useDrawingEngine = ({
             }
         }
         
-        return () => revokeLastUrl();
     }, [layer.id, paintNode?.id, paintNode?.data.paintData, paintInputPayload, layer.data.width, layer.data.height]);
 
     const getCoords = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {

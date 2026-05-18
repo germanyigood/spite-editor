@@ -18,7 +18,7 @@ export interface ContextMenuSeparator {
 
 export type ContextMenuEntry = ContextMenuItem | ContextMenuSeparator;
 
-interface ContextMenuConfig {
+export interface ContextMenuConfig {
     x: number;
     y: number;
     items: ContextMenuEntry[];
@@ -82,6 +82,8 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({ config, onClose }) => 
                 {...getFloatingProps()}
                 className="z-[200] bg-panel border-2 border-border-base/10 shadow-[0_10px_40px_rgba(0,0,0,0.3)] rounded-lg py-1 min-w-[160px] flex flex-col max-h-[80vh] overflow-y-auto"
                 onContextMenu={(e) => e.preventDefault()}
+                onMouseDown={(e) => e.stopPropagation()}
+                onWheel={(e) => e.stopPropagation()}
             >
                 {config.header && (
                     <div className="px-3 py-1.5 text-[10px] text-txt-muted font-bold uppercase tracking-widest border-b border-border-base/10 mb-1 flex items-center justify-between sticky top-0 bg-panel z-10">

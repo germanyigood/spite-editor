@@ -168,18 +168,20 @@ export const E2EDebugUI: React.FC<DebugUIProps> = ({
                             <div key={s.id} className={`rounded-2xl border transition-all overflow-hidden ${isActive ? 'bg-blue-500/5 border-blue-500/30' : isFailed ? 'bg-red-500/5 border-red-500/30' : isFinished ? 'bg-green-500/5 border-green-500/30' : 'bg-surface/30 border-border-base/5'}`}>
                                 <div onClick={() => setExpandedScenarios(prev => ({...prev, [s.id]: !prev[s.id]}))} className="flex items-center justify-between p-4 cursor-pointer group">
                                     <div className="flex items-center gap-4 flex-1 min-w-0">
-                                        {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                                        <div className="min-w-0">
-                                            <h4 className="font-bold text-sm flex items-center gap-2">
-                                                {s.name}
-                                                {isActive && <Loader2 size={12} className="animate-spin text-blue-500" />}
-                                                {isFinished && <CheckCircle2 size={12} className="text-green-500" />}
-                                                {isFailed && <AlertTriangle size={12} className="text-red-500" />}
+                                        <div className="shrink-0">
+                                            {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                            <h4 className="font-bold text-sm flex items-center gap-2 flex-wrap">
+                                                <span className="truncate">{s.name}</span>
+                                                {isActive && <Loader2 size={12} className="shrink-0 animate-spin text-blue-500" />}
+                                                {isFinished && <CheckCircle2 size={12} className="shrink-0 text-green-500" />}
+                                                {isFailed && <AlertTriangle size={12} className="shrink-0 text-red-500" />}
                                             </h4>
-                                            <p className="text-[11px] text-txt-muted truncate">{s.description}</p>
+                                            <p className="text-[11px] text-txt-muted mt-1 break-words whitespace-normal line-clamp-2 md:line-clamp-none">{s.description}</p>
                                         </div>
                                     </div>
-                                    <button onClick={(e) => { e.stopPropagation(); onRunE2E(s.id); }} disabled={isRunning} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[11px] font-bold transition-all disabled:opacity-30 border ${isRunning ? 'bg-blue-500/10 text-blue-500 border-blue-500/20' : 'bg-purple-500/10 text-purple-500 border-purple-500/20 hover:bg-purple-500 hover:text-white'}`}>
+                                    <button onClick={(e) => { e.stopPropagation(); onRunE2E(s.id); }} disabled={isRunning} className={`shrink-0 ml-4 flex items-center gap-2 px-4 py-2 rounded-xl text-[11px] font-bold transition-all disabled:opacity-30 border ${isRunning ? 'bg-blue-500/10 text-blue-500 border-blue-500/20' : 'bg-purple-500/10 text-purple-500 border-purple-500/20 hover:bg-purple-500 hover:text-white'}`}>
                                         {isActive ? 'Simulating...' : 'Run Flow'}
                                     </button>
                                 </div>

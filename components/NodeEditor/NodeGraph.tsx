@@ -218,6 +218,7 @@ const NodeGraph: React.FC<NodeGraphProps> = ({ visible = true, nodeOutputs }) =>
             ],
             [
                 { type: 'normal_map', label: 'Normal Map', icon: Lightbulb, colorClass: 'text-amber-500 dark:text-amber-400' },
+                { type: 'warp', label: 'Warp Transform', icon: Scissors, colorClass: 'text-amber-500 dark:text-amber-400' },
                 { type: 'seamless', label: 'Seamless Tile', icon: Grid3X3, colorClass: 'text-pink-500 dark:text-pink-300' }
             ],
             [

@@ -13,6 +13,7 @@ import { timeline_frames_workflow } from './scenarios/timeline_frames';
 import { paint_node_workflow } from './scenarios/paint_node_workflow';
 import { chroma_key_workflow } from './scenarios/chroma_key_workflow';
 import { undo_redo_workflow } from './scenarios/undo_redo_workflow';
+import { node_context_menu_workflow } from './scenarios/node_context_menu';
 
 export const E2E_SCENARIOS: E2EScenario[] = [
     selection_extract_workflow,
@@ -20,6 +21,7 @@ export const E2E_SCENARIOS: E2EScenario[] = [
     basic_workflow,
     node_graph_interaction,
     node_bypass_workflow,
+    node_context_menu_workflow,
     viewport_sync,
     layout_composition,
     animation_management,

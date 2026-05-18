@@ -388,7 +388,7 @@ const Timeline: React.FC<TimelineProps> = ({ generatedFrames, nodeOutputs }) => 
             </button>
             <div className="h-4 w-px bg-border-base/10" />
             <div className="text-[10px] text-txt-muted font-mono bg-surface/50 px-2 py-0.5 rounded border border-border-base/5">
-                <span className="text-txt-primary">{currentFrameIndex + 1}</span> <span className="opacity-50">/ {frames.length}</span>
+                <span data-testid="timeline-playhead-index" className="text-txt-primary">{currentFrameIndex + 1}</span> <span className="opacity-50">/ {frames.length}</span>
             </div>
         </div>
 

@@ -105,8 +105,14 @@ export const MainWorkspace: React.FC = () => {
     const handleRunE2E = useCallback((scenarioId: string) => {
         setE2EStepState(prev => ({ ...prev, [scenarioId]: { setup: {}, steps: {} } }));
         setShowDebug(false);
-        e2eEngineRef.current?.run(scenarioId, E2E_SCENARIOS);
+        return e2eEngineRef.current?.run(scenarioId, E2E_SCENARIOS);
     }, []);
+
+    useEffect(() => {
+        (window as any).__RUN_E2E__ = async (id: string) => {
+             return await handleRunE2E(id);
+        };
+    }, [handleRunE2E]);
 
     const handleRunAllE2E = useCallback(() => {
         const resetState: typeof e2eStepState = {};

@@ -1,37 +1,29 @@
-# E2E Testing Backlog
+# Implementation Plan: Export System Overhaul
 
-## Missing Coverage Areas
+## 1. Export UI Updates (`components/panels/ExportPanel.tsx`)
+- Extract the "Save Project (.sforge)" button to the top of the panel or even outside it, to visually distinguish it from the final asset exports.
+- Add a new "Export Settings" section with a toggle switch: "Download as ZIP Archive" (defaults to true).
+- Update the export buttons grid:
+  - **Images** (Currently PNG/Spritesheets).
+  - **TS (Base64)** (Current TS Code).
+  - **TS (SFTS)** (New: Linked TS + PNGs).
+  - **JSON (SFA)** (New: Linked JSON + PNGs).
 
-1. **Timeline Interactions (`timeline_playback.ts`)**
-   - Play/Pause toggle state verification.
-   - Adjusting FPS affects simulation (if testable).
-   - Clicking on a specific frame index updates the selected frame for the active layer.
+## 2. Refactor `useProjectExport.ts`
+- Update the `useProjectExport` hook signature to accept export configuration (or pass it through the `handleExport` parameters), specifically a `asZip` boolean flag.
+- Refactor the code generation logic:
+  - Separate out a function to collect all assets (blobs mapped to filenames) and the data structure representing the animations.
+  - Based on the format (Base64 TS vs SFTS vs SFA), generate the final text file.
+- Handle multi-file downloading:
+  - Write a helper to iterate over a Map of files (Blobs or Strings) and trigger an `a` tag download for each, with a slight delay (e.g. 100ms) to bypass basic browser multi-download prevention limiters.
 
-2. **Paint Node Workflow (`paint_node_workflow.ts`)**
-   - Going to "Draw" tool mode.
-   - Select brush, change thickness and color.
-   - Dragging across the sprite editor canvas (simulating drawing).
-   - Verifying the preview node or subsequent node output updates.
+## 3. Data Structure Definition for SFTS and SFA
+- For `sfts`, format the output exactly like the current `ts` export, but instead of replacing the `image` string with base64, replace it with `"{animName}_{key}.png"`.
+- For `sfa`, parse the structural data and wrap it in a proper `JSON.stringify` call, saving it as `[projectName].json`.
 
-3. **Chroma Key Editing (`chroma_key_workflow.ts`)**
-   - Select Chroma Node in graph.
-   - Pick the target color to key out from the color picker in properties panel.
-   - Adjust Tolerance and Spill.
-   - Verify visually/programmatically that the output preview changes.
-
-4. **Undo/Redo System (`undo_redo_workflow.ts`)**
-   - Perform an action (e.g. creating a layer, adding a node, moving a node).
-   - Trigger Undo (Ctrl+Z).
-   - Verify state reverts.
-   - Trigger Redo (Ctrl+Y/Shift+Ctrl+Z).
-   - Verify state restores.
-
-5. **Project Management / Export (`project_mgmt.ts`)**
-   - Download the project configurations.
-   - Testing updating project settings.
-
-## Completion Status
-- [x] Timeline Interactions (`tests/scenarios/timeline_playback.ts`)
-- [x] Paint Node Workflow (`tests/scenarios/paint_node_workflow.ts`)
-- [x] Chroma Key Editing (`tests/scenarios/chroma_key_workflow.ts`)
-- [x] Undo/Redo System (`tests/scenarios/undo_redo_workflow.ts`)
+## Proceeding with Execution
+Once the user confirms this plan, we will:
+1. Update UI components (`ExportPanel.tsx`).
+2. Update the hook (`useProjectExport.ts`).
+3. Add helper functions in `utils/io.ts` if needed.
+4. Verify by running the application.

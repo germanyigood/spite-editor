@@ -18,6 +18,7 @@ const TimelineFrameItem = React.memo(({
 }: any) => {
     return (
         <div
+            data-testid={`timeline-frame-item-${index}`}
             draggable
             onDragStart={(e) => onDragStart(e, index)}
             onDragOver={(e) => onDragOver(e, index)}
@@ -244,6 +245,22 @@ const Timeline: React.FC<TimelineProps> = ({ generatedFrames, nodeOutputs }) => 
 
   // --- Context Menu Actions ---
 
+  const performAction = useCallback((action: 'duplicate' | 'delete', index: number) => {
+      const newFrames = [...frames];
+
+      if (action === 'delete') {
+          newFrames.splice(index, 1);
+          let newCursor = activeTimelineNode?.data.currentFrame || 0;
+          if (newCursor >= newFrames.length) newCursor = Math.max(0, newFrames.length - 1);
+          updateTimeline({ frames: newFrames, currentFrame: newCursor });
+          if (index === selectedTimelineIndex) dispatch({ type: 'SELECT_TIMELINE_FRAME', payload: null });
+      } else if (action === 'duplicate') {
+          newFrames.splice(index + 1, 0, frames[index]);
+          updateTimeline({ frames: newFrames });
+      }
+      setContextMenuConfig(null);
+  }, [frames, activeTimelineNode?.data.currentFrame, selectedTimelineIndex, dispatch, updateTimeline]);
+
   const handleContextMenu = useCallback((e: React.MouseEvent, index: number) => {
       e.preventDefault();
       e.stopPropagation();
@@ -268,23 +285,7 @@ const Timeline: React.FC<TimelineProps> = ({ generatedFrames, nodeOutputs }) => 
               }
           ]
       });
-  }, []);
-
-  const performAction = (action: 'duplicate' | 'delete', index: number) => {
-      const newFrames = [...frames];
-
-      if (action === 'delete') {
-          newFrames.splice(index, 1);
-          let newCursor = activeTimelineNode?.data.currentFrame || 0;
-          if (newCursor >= newFrames.length) newCursor = Math.max(0, newFrames.length - 1);
-          updateTimeline({ frames: newFrames, currentFrame: newCursor });
-          if (index === selectedTimelineIndex) dispatch({ type: 'SELECT_TIMELINE_FRAME', payload: null });
-      } else if (action === 'duplicate') {
-          newFrames.splice(index + 1, 0, frames[index]);
-          updateTimeline({ frames: newFrames });
-      }
-      setContextMenuConfig(null);
-  };
+  }, [performAction]);
 
   // --- Drag & Drop ---
 

@@ -96,6 +96,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({ config, onClose }) => 
                     return (
                         <button
                             key={item.id}
+                            data-testid={`context-menu-item-${item.id}`}
                             onClick={() => {
                                 item.onClick();
                                 onClose();

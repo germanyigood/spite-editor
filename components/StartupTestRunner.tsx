@@ -43,6 +43,12 @@ export function subscribeToJasmineTests(listener: () => void) {
     };
 }
 
+export function rerunUnitTests() {
+    if (window.__rerunJasmineTests) {
+        window.__rerunJasmineTests();
+    }
+}
+
 let testStatus: 'loading' | 'running' | 'success' | 'failure' = 'loading';
 let testStats = { total: 0, passed: 0, failed: 0 };
 let isInitialized = false;
@@ -59,6 +65,7 @@ declare global {
     jasmineRequire: any;
     __specsDefined?: boolean;
     __jasmineRunning?: boolean;
+    __rerunJasmineTests?: () => void;
   }
 }
 
@@ -110,6 +117,9 @@ const initializeTests = () => {
 
     testStatus = 'running';
     jasmineTestState.status = 'running';
+    jasmineTestState.results = [];
+    jasmineTestState.stats = { total: 0, passed: 0, failed: 0 };
+    testStats = { total: 0, passed: 0, failed: 0 };
     notifyListeners();
 
     const env = window.jasmine.getEnv();
@@ -176,6 +186,8 @@ const initializeTests = () => {
     env.execute();
   };
 
+  window.__rerunJasmineTests = runTests;
+
   loadJasmine();
 };
 
@@ -204,8 +216,10 @@ const StartupTestRunner: React.FC<StartupTestRunnerProps> = ({ onOpenDebug }) =>
 
   useEffect(() => {
     if (status === 'success') {
-      const timer = setTimeout(() => setIsVisible(false), 1000);
+      const timer = setTimeout(() => setIsVisible(false), 2000);
       return () => clearTimeout(timer);
+    } else if (status === 'running') {
+      setIsVisible(true);
     }
   }, [status]);
 

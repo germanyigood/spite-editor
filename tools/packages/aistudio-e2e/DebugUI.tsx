@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { X, Bug, CheckCircle2, XCircle, Play, Zap, Eye, Loader2, ChevronRight, ChevronDown, Circle, AlertTriangle, Settings2, Square, Terminal, History, SkipForward } from 'lucide-react';
 import { E2EScenario, StepStatus } from './types';
-import { jasmineTestState, subscribeToJasmineTests, UnitTestResult } from '../../../components/StartupTestRunner';
+import { jasmineTestState, subscribeToJasmineTests, UnitTestResult, rerunUnitTests } from '../../../components/StartupTestRunner';
 
 interface DebugUIProps {
   onClose: () => void;
@@ -90,29 +90,45 @@ export const E2EDebugUI: React.FC<DebugUIProps> = ({
                 <div className="space-y-4">
                     <h3 className="text-xs font-bold uppercase tracking-widest opacity-50 flex items-center gap-2"><Zap size={12}/> Controls</h3>
                     
-                    {!isRunning ? (
-                        <button onClick={onRunAll} className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl shadow-xl shadow-indigo-500/20 transition-all font-bold group">
-                            <SkipForward size={18} fill="currentColor" className="group-hover:translate-x-0.5 transition-transform" />
-                            <span>Run All Scenarios</span>
-                        </button>
+                    {activeTab === 'E2E' ? (
+                        !isRunning ? (
+                            <button onClick={onRunAll} className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl shadow-xl shadow-indigo-500/20 transition-all font-bold group">
+                                <SkipForward size={18} fill="currentColor" className="group-hover:translate-x-0.5 transition-transform" />
+                                <span>Run All Scenarios</span>
+                            </button>
+                        ) : (
+                            <button onClick={() => onStopE2E?.()} className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl shadow-xl shadow-blue-500/20 transition-all font-bold animate-pulse">
+                                <Square size={18} fill="currentColor" />
+                                <span>Stop Simulation</span>
+                            </button>
+                        )
                     ) : (
-                        <button onClick={() => onStopE2E?.()} className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl shadow-xl shadow-blue-500/20 transition-all font-bold animate-pulse">
-                            <Square size={18} fill="currentColor" />
-                            <span>Stop Simulation</span>
-                        </button>
+                        unitTestState.status === 'running' ? (
+                             <button disabled className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-gray-600 text-white rounded-2xl transition-all font-bold opacity-50">
+                                <Loader2 size={18} className="animate-spin" />
+                                <span>Running Units...</span>
+                            </button>
+                        ) : (
+                             <button onClick={rerunUnitTests} className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl shadow-xl shadow-indigo-500/20 transition-all font-bold group">
+                                <Play size={18} fill="currentColor" className="group-hover:translate-x-0.5 transition-transform" />
+                                <span>Run Unit Tests</span>
+                            </button>
+                        )
                     )}
 
-                    <div className="pt-2 space-y-2">
-                        <label className="text-[9px] font-bold uppercase tracking-widest opacity-50 block">Simulation Speed</label>
-                        <div className="flex bg-surface rounded-xl p-1 border border-border-base/10">
-                            {[{ val: 0.3, label: 'Fast', icon: Zap }, { val: 1, label: 'Normal', icon: Play }, { val: 3, label: 'Slow', icon: Eye }].map(s => (
-                                <button key={s.val} onClick={() => onSetSpeed?.(s.val)} className={`flex-1 py-2 px-1 rounded-lg text-[10px] font-bold flex flex-col items-center gap-1 transition-all ${simSpeed === s.val ? (isRunning ? 'bg-blue-500' : 'bg-purple-500') + ' text-white shadow-lg' : 'text-txt-muted hover:bg-surface-hover/10'}`}>
-                                    <s.icon size={12} />
-                                    <span>{s.label}</span>
-                                </button>
-                            ))}
+                    {activeTab === 'E2E' && (
+                        <div className="pt-2 space-y-2">
+                            <label className="text-[9px] font-bold uppercase tracking-widest opacity-50 block">Simulation Speed</label>
+                            <div className="flex bg-surface rounded-xl p-1 border border-border-base/10">
+                                {[{ val: 0.3, label: 'Fast', icon: Zap }, { val: 1, label: 'Normal', icon: Play }, { val: 3, label: 'Slow', icon: Eye }].map(s => (
+                                    <button key={s.val} onClick={() => onSetSpeed?.(s.val)} className={`flex-1 py-2 px-1 rounded-lg text-[10px] font-bold flex flex-col items-center gap-1 transition-all ${simSpeed === s.val ? (isRunning ? 'bg-blue-500' : 'bg-purple-500') + ' text-white shadow-lg' : 'text-txt-muted hover:bg-surface-hover/10'}`}>
+                                        <s.icon size={12} />
+                                        <span>{s.label}</span>
+                                    </button>
+                                ))}
+                            </div>
                         </div>
-                    </div>
+                    )}
                 </div>
                 <div className="mt-auto space-y-4 pt-6 border-t border-border-base/5">
                     <h3 className="text-xs font-bold uppercase tracking-widest opacity-50">Results</h3>
@@ -197,27 +213,46 @@ export const E2EDebugUI: React.FC<DebugUIProps> = ({
                             </div>
                         );
                     }) : (
-                        <div className="space-y-2">
-                           {unitTestState.results.map((res, i) => (
-                               <div key={i} className={`p-3 rounded-xl border flex flex-col gap-2 ${res.status === 'failed' ? 'bg-red-500/5 border-red-500/20' : 'bg-surface border-border-base/5'}`}>
-                                   <div className="flex items-center gap-3">
-                                       <div className="shrink-0">{getStepIcon(res.status as StepStatus)}</div>
-                                       <span className="text-xs font-bold text-txt-primary">{res.fullName}</span>
-                                   </div>
-                                   {res.failedExpectations?.length > 0 && (
-                                       <div className="ml-6 flex flex-col gap-1">
-                                           {res.failedExpectations.map((err, errIdx) => (
-                                                <div key={errIdx} className="p-2 bg-red-500/10 rounded-lg text-[10px] text-red-400 font-mono border border-red-500/10">
-                                                    <div>ERR: {err.message}</div>
-                                                </div>
-                                           ))}
-                                       </div>
-                                   )}
-                               </div>
-                           ))}
+                        <div className="space-y-4">
                            {unitTestState.status === 'running' && (
-                               <div className="flex items-center gap-2 text-txt-muted text-xs p-4"><Loader2 className="animate-spin" size={14}/> Running unit tests...</div>
+                               <div className="flex items-center gap-3 text-blue-500 font-bold text-sm p-4 bg-blue-500/10 rounded-xl border border-blue-500/20">
+                                   <Loader2 className="animate-spin" size={18}/> 
+                                   Running Unit Tests...
+                               </div>
                            )}
+                           {unitTestState.status === 'success' && (
+                               <div className="flex items-center gap-3 text-green-500 font-bold text-sm p-4 bg-green-500/10 rounded-xl border border-green-500/20">
+                                   <CheckCircle2 size={18}/> 
+                                   All Tests Passed Successfully
+                               </div>
+                           )}
+                           {unitTestState.status === 'failure' && (
+                               <div className="flex items-center gap-3 text-red-500 font-bold text-sm p-4 bg-red-500/10 rounded-xl border border-red-500/20">
+                                   <XCircle size={18}/> 
+                                   {unitTestState.stats.failed} Tests Failed
+                               </div>
+                           )}
+                           
+                           <div className="space-y-2">
+                               {unitTestState.results.map((res, i) => (
+                                   <div key={i} className={`p-3 rounded-xl border flex flex-col gap-2 ${res.status === 'failed' ? 'bg-red-500/5 border-red-500/20' : 'bg-surface border-border-base/5'}`}>
+                                       <div className="flex items-center gap-3">
+                                           <div className="shrink-0">{getStepIcon(res.status === 'passed' ? 'success' : res.status === 'failed' ? 'failed' : 'pending')}</div>
+                                           <span className={`text-xs font-bold ${res.status === 'failed' ? 'text-red-400' : 'text-txt-primary'}`}>{res.fullName}</span>
+                                       </div>
+                                       {res.failedExpectations?.length > 0 && (
+                                           <div className="ml-6 flex flex-col gap-1">
+                                               {res.failedExpectations.map((err, errIdx) => (
+                                                    <div key={errIdx} className="p-2 bg-red-500/10 rounded-lg text-[10px] text-red-400 font-mono border border-red-500/10 overflow-x-auto whitespace-pre-wrap">
+                                                        <div>{err.message}</div>
+                                                    </div>
+                                               ))}
+                                           </div>
+                                       )}
+                                   </div>
+                               ))}
+                           </div>
+                           
                            {unitTestState.results.length === 0 && unitTestState.status !== 'running' && (
                                <div className="text-txt-muted text-xs p-4 italic">No unit tests recorded or tests failed to initialize.</div>
                            )}

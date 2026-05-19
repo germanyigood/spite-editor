@@ -318,7 +318,7 @@ const NodeGraph: React.FC<NodeGraphProps> = ({ visible = true, nodeOutputs }) =>
                     {dragEdgePos && dragState?.id && dragState?.handleId && (
                         <path 
                             d={`M ${nodes.find(n => n.id === dragState.id)?.x! + nodes.find(n => n.id === dragState.id)?.width!} ${getSocketYImpl(nodes.find(n => n.id === dragState.id)!, dragState.handleId, 'outputs')} C ${nodes.find(n => n.id === dragState.id)?.x! + nodes.find(n => n.id === dragState.id)?.width! + 50} ${getSocketYImpl(nodes.find(n => n.id === dragState.id)!, dragState.handleId, 'outputs')}, ${dragEdgePos.x - 50} ${dragEdgePos.y}, ${dragEdgePos.x} ${dragEdgePos.y}`}
-                            stroke="#ffffff" strokeWidth="2" strokeDasharray="5,5" fill="none" className="pointer-events-none" 
+                            stroke="currentColor" strokeWidth="2" strokeDasharray="5,5" fill="none" className="pointer-events-none text-txt-primary" 
                         />
                     )}
                 </svg>

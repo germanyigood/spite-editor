@@ -40,7 +40,7 @@ const MainViewportStack = memo(({ toolMode, nodeOutputs, currentAnim, layerCount
         return (
             <div className="h-full w-full p-10 flex items-center justify-center bg-transparent">
                 <div className="w-full max-w-[400px] h-[400px]">
-                    <DropZone onFileReady={onFileLoad} message={<span>Upload assets for <strong className="text-white">{currentAnim?.name || 'Project'}</strong></span>} />
+                    <DropZone onFileReady={onFileLoad} message={<span>Upload assets for <strong className="text-indigo-800 dark:text-white">{currentAnim?.name || 'Project'}</strong></span>} />
                 </div>
             </div>
         );

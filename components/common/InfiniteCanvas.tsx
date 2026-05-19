@@ -39,19 +39,31 @@ export const InfiniteCanvas = forwardRef<HTMLDivElement, InfiniteCanvasProps>(({
     const handleWheel = (e: React.WheelEvent) => {
         e.preventDefault();
         
-        // Calculate new scale
-        const scaleAmount = -e.deltaY * 0.001;
-        const newScale = Math.min(Math.max(minScale, transform.scale * (1 + scaleAmount)), maxScale);
+        // On Mac Trackpad: two-finger swipe has ctrlKey=false and generates deltaX/deltaY for panning.
+        // Pinch-to-zoom has ctrlKey=true and generates deltaY for zooming.
+        if (!e.ctrlKey) {
+            // Trackpad Pan / Mouse wheel vertical pan
+            const newX = transform.x - e.deltaX;
+            const newY = transform.y - e.deltaY;
+            onChange({ x: newX, y: newY, scale: transform.scale });
+            return;
+        }
+
+        // Calculate new scale additively for robustness against huge deltaY from trackpads
+        const newScale = Math.min(maxScale, Math.max(minScale, transform.scale - e.deltaY * 0.003));
         
         // Calculate zoom origin (mouse position)
         const container = e.currentTarget.getBoundingClientRect();
         const mouseX = e.clientX - container.left;
         const mouseY = e.clientY - container.top;
 
-        // Calculate new offset to keep mouse over same point
-        const scaleRatio = newScale / transform.scale;
-        const newX = mouseX - (mouseX - transform.x) * scaleRatio;
-        const newY = mouseY - (mouseY - transform.y) * scaleRatio;
+        // Calculate original world pos under mouse
+        const worldX = (mouseX - transform.x) / transform.scale;
+        const worldY = (mouseY - transform.y) / transform.scale;
+
+        // Reposition to keep mouse over the same world coordinate
+        const newX = mouseX - worldX * newScale;
+        const newY = mouseY - worldY * newScale;
 
         onChange({ x: newX, y: newY, scale: newScale });
     };

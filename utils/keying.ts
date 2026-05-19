@@ -195,6 +195,15 @@ export const processKeying = (
     // --- 4. Post-Process: Matte Blur ---
     if (config.blur && config.blur > 0) {
         applyMatteBlur(data, width, height, config.blur);
+        
+        if (config.blurContrast && config.blurContrast > 0) {
+            const cutoff = (config.blurContrast / 100) * 255;
+            for (let i = 0; i < len; i += 4) {
+                if (data[i + 3] < 255 && data[i + 3] <= cutoff) {
+                    data[i + 3] = 0;
+                }
+            }
+        }
     }
 
     ctx.putImageData(imageData, 0, 0);

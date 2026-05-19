@@ -21,6 +21,7 @@ export const defineProjectSpecs = () => {
                         id: 'src1', 
                         type: 'source', 
                         x: 10, y: 10, width: 100, height: 100,
+                        pinnedAt: 123456789,
                         // This complex object mimics real node data
                         data: { 
                             src: 'data:image/png;base64,fake',
@@ -64,6 +65,7 @@ export const defineProjectSpecs = () => {
         
         // 3. Verify Data Persistence
         expect(node.data).toBeDefined();
+        expect(node.pinnedAt).toBe(123456789);
         const data = node.data as any;
         expect(data.customProp).toBe(999);
         expect(data.nested.foo).toBe('bar');

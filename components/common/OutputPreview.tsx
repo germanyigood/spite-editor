@@ -1,12 +1,13 @@
 
 import React, { useState, useEffect } from 'react';
 import { NodePayload } from '../../types';
-import { Play, Pause } from 'lucide-react';
+import { Play, Pause, PaintBucket } from 'lucide-react';
 import { BitmapView } from './BitmapView';
 
 export const OutputPreview = React.memo(({ input, label = "Preview" }: { input?: NodePayload, label?: string }) => {
     const isTimeline = input?.type === 'TIMELINE';
     const [idx, setIdx] = useState(0);
+    const [bgColor, setBgColor] = useState<string>('transparent');
 
     const fps = (isTimeline && input?.fps) ? input.fps : 12;
     const isPlaying = (isTimeline && input?.isPlaying !== undefined) ? input.isPlaying : true;
@@ -38,13 +39,15 @@ export const OutputPreview = React.memo(({ input, label = "Preview" }: { input?:
         dims = `${src.width}x${src.height}`;
     }
 
+    const bgStyle = bgColor === 'transparent' ? {} : { backgroundColor: bgColor };
+
     return (
         <div className="flex flex-col h-full gap-2">
             <div 
-                className="flex-1 bg-black/5 dark:bg-black/50 rounded-lg border border-border-base/10 checkerboard overflow-hidden relative cursor-pointer group shadow-inner"
+                className={`flex-1 rounded-lg border border-border-base/10 overflow-hidden relative cursor-pointer group shadow-inner ${bgColor === 'transparent' ? 'bg-black/5 dark:bg-black/50 checkerboard' : ''}`}
+                style={bgStyle}
             >
                 {hasData ? (
-                    // We remove extra styles because BitmapView (mode='contain') handles filling parent now
                     <BitmapView 
                         image={src} 
                         mode="contain"
@@ -52,7 +55,7 @@ export const OutputPreview = React.memo(({ input, label = "Preview" }: { input?:
                     />
                 ) : (
                     <div className="w-full h-full flex items-center justify-center">
-                        <span className="text-[9px] text-txt-muted font-medium uppercase tracking-wider">Empty</span>
+                        <span className="text-[9px] text-txt-muted font-medium uppercase tracking-wider mix-blend-difference">Empty</span>
                     </div>
                 )}
 
@@ -63,10 +66,29 @@ export const OutputPreview = React.memo(({ input, label = "Preview" }: { input?:
                 )}
                 
                 {dims && (
-                    <div className="absolute top-2 left-2 px-1.5 py-0.5 bg-white/90 dark:bg-black/60 text-[8px] text-txt-primary dark:text-gray-400 rounded backdrop-blur-md font-mono border border-border-base/10 shadow-sm pointer-events-none">
+                    <div className="absolute top-2 left-2 px-1.5 py-0.5 bg-white/90 dark:bg-black/80 text-[8px] text-txt-primary dark:text-gray-300 rounded backdrop-blur-md font-mono border border-border-base/10 shadow-sm pointer-events-none mix-blend-luminosity">
                         {dims}
                     </div>
                 )}
+
+                <div className="absolute top-2 right-2 flex items-center bg-black/60 backdrop-blur-md rounded border border-white/10 overflow-hidden">
+                    <button 
+                        onClick={() => setBgColor('transparent')}
+                        className={`w-5 h-5 flex items-center justify-center text-white/70 hover:text-white hover:bg-white/20 transition-colors ${bgColor === 'transparent' ? 'bg-white/20' : ''}`}
+                        title="Transparent Background"
+                    >
+                        <div className="w-3 h-3 checkerboard rounded-sm border border-white/30" />
+                    </button>
+                    <div className="relative w-5 h-5 flex items-center justify-center text-white/70 hover:text-white hover:bg-white/20 transition-colors cursor-pointer" title="Solid Color Background">
+                        <PaintBucket size={11} />
+                        <input 
+                            type="color" 
+                            className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" 
+                            value={bgColor === 'transparent' ? '#000000' : bgColor}
+                            onChange={(e) => setBgColor(e.target.value)}
+                        />
+                    </div>
+                </div>
             </div>
             
             <div className="flex items-center justify-between px-1">

@@ -21,6 +21,8 @@ import { definePixelizeSpecs } from '../tests/pixelize.spec';
 import { defineGridMissingSpecs } from '../tests/gridMissing.spec';
 import { defineHeadlessBypassSpecs } from '../tests/headlessBypass.spec';
 import { defineInputsSpecs } from '../tests/inputs.spec';
+import { defineKeyingSpecs } from '../tests/keying.spec';
+import { defineFrameSkipSpecs } from '../tests/frameSkip.spec';
 
 export interface UnitTestResult {
   id: string;
@@ -132,7 +134,8 @@ const initializeTests = () => {
         definePerformanceSpecs(); defineVideoSpecs(); defineSwitcherSpecs();
         defineLayoutSpecs(); defineTopologySpecs(); defineSyncSpecs();
         defineDrawSpecs(); definePixelizeSpecs(); defineGridMissingSpecs();
-        defineHeadlessBypassSpecs(); defineInputsSpecs();
+        defineHeadlessBypassSpecs(); defineInputsSpecs(); defineKeyingSpecs();
+        defineFrameSkipSpecs();
         window.__specsDefined = true;
     }
 

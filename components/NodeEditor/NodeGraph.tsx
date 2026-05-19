@@ -2,7 +2,7 @@
 import React, { useRef, memo, useMemo, useState, useEffect } from 'react';
 import { useProject } from '../../context/ProjectContext';
 import { NodeData, Connection, NodePayload, NodeType } from '../../types';
-import { Image as ImageIcon, Cable, Trash2, Sparkles, Brush, Grid3X3, CircuitBoard, PaintBucket, ImagePlus, Palette, CircleDashed, Layers, Scissors, Lightbulb, Film, Crop, Scaling, Gauge, MonitorUp } from 'lucide-react';
+import { Image as ImageIcon, Cable, Trash2, Sparkles, Brush, Grid3X3, CircuitBoard, PaintBucket, ImagePlus, Palette, CircleDashed, Layers, Scissors, Lightbulb, Film, Crop, Scaling, Gauge, MonitorUp, FastForward } from 'lucide-react';
 
 // Logic & Data
 import { useGraphInteraction } from './hooks/useGraphInteraction';
@@ -224,6 +224,7 @@ const NodeGraph: React.FC<NodeGraphProps> = ({ visible = true, nodeOutputs }) =>
             [
                 { type: 'frame_normalize', label: 'Frame Size', icon: Scaling, colorClass: 'text-cyan-600 dark:text-cyan-400' },
                 { type: 'timeline', label: 'Timeline', icon: Film, colorClass: 'text-green-600 dark:text-green-400' },
+                { type: 'frame_skip', label: 'Decimate Frames', icon: FastForward, colorClass: 'text-indigo-500 dark:text-indigo-400' },
                 { type: 'crop', label: 'Crop', icon: Crop, colorClass: 'text-orange-600 dark:text-orange-400' },
                 { type: 'resize', label: 'Resize Output', icon: Scaling, colorClass: 'text-cyan-600 dark:text-cyan-400' },
                 { type: 'optimize', label: 'Optimization', icon: Gauge, colorClass: 'text-yellow-600 dark:text-yellow-400' }

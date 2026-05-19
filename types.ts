@@ -74,6 +74,7 @@ export interface KeyingConfig {
   smoothness: number;
   spill: number;
   blur?: number; // New: Edge Blur radius
+  blurContrast?: number; // New: Edge Blur contrast cutoff
   invert?: boolean; // New: Keep Color mode
   clipBlack: number;
   clipWhite: number;
@@ -149,7 +150,7 @@ export interface ExportConfig {
 
 // --- Node Types (Discriminated Union) ---
 
-export type NodeType = 'source' | 'chroma' | 'grid' | 'normal_map' | 'timeline' | 'crop' | 'output' | 'seamless' | 'color_correct' | 'resize' | 'frame_normalize' | 'optimize' | 'outline' | 'drop_shadow' | 'generate' | 'composite' | 'fill_color' | 'paint' | 'warp' | 'pixelize';
+export type NodeType = 'source' | 'chroma' | 'grid' | 'normal_map' | 'timeline' | 'crop' | 'output' | 'seamless' | 'color_correct' | 'resize' | 'frame_normalize' | 'optimize' | 'outline' | 'drop_shadow' | 'generate' | 'composite' | 'fill_color' | 'paint' | 'warp' | 'pixelize' | 'frame_skip';
 
 interface BaseNode {
     id: string;

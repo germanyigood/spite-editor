@@ -23,6 +23,7 @@ import { CompositeBundle } from './CompositeNode';
 import { FillBundle } from './FillNode';
 import { PaintBundle } from './PaintNode';
 import { PixelizeBundle } from './PixelizeNode';
+import { FrameSkipBundle } from './FrameSkipNode';
 
 // --- Type Definitions ---
 
@@ -62,6 +63,7 @@ export const NODE_REGISTRY: Record<string, NodeBundle> = {
     output: OutputBundle,
     seamless: SeamlessBundle,
     color_correct: ColorCorrectBundle,
+    frame_skip: FrameSkipBundle,
     optimize: OptimizeBundle,
     outline: OutlineBundle,
     drop_shadow: DropShadowBundle,

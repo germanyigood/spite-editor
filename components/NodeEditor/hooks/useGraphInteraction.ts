@@ -276,7 +276,13 @@ export const useGraphInteraction = (
 
     const handleWheel = useCallback((e: WheelEvent) => {
         const curTransform = transformRef.current;
-        const s = Math.min(4, Math.max(0.1, curTransform.scale - e.deltaY * 0.001));
+        
+        if (!e.ctrlKey) {
+            updateGraph({ viewport: { ...curTransform, x: curTransform.x - e.deltaX, y: curTransform.y - e.deltaY } });
+            return;
+        }
+
+        const s = Math.min(4, Math.max(0.1, curTransform.scale - e.deltaY * 0.003));
         const rect = containerRef.current?.getBoundingClientRect();
         if(!rect) return;
         const mx = e.clientX - rect.left, my = e.clientY - rect.top;

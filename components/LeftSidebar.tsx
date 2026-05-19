@@ -77,10 +77,6 @@ const LeftSidebar: React.FC<LeftSidebarProps> = ({ onImportFile, onExport, copyS
   return (
     <aside className="w-80 bg-panel/60 backdrop-blur-2xl border-r border-border-base/10 flex flex-col shrink-0 z-20 shadow-[10px_0_30px_rgba(0,0,0,0.05)] relative transition-colors duration-300">
       <div className="flex-1 flex flex-col min-h-0 relative z-10">
-        <div className="px-5 py-4 border-b border-border-base/10 text-[10px] font-bold text-txt-muted uppercase tracking-widest bg-panel/10 flex justify-between items-center shrink-0">
-            <span>Project Explorer</span>
-            <span className="text-[9px] text-txt-secondary bg-surface/50 px-1.5 py-0.5 rounded">v1.2</span>
-        </div>
         <div className="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-4">
             <AnimationListPanel 
                 animations={animations}

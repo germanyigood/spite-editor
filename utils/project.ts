@@ -24,7 +24,11 @@ const nodeSchema = yup.object({
     height: yup.number().default(100),
     // CRITICAL FIX: Use mixed() instead of object() to prevent stripping unknown keys.
     // Node data contains arbitrary properties (src, frames, etc.) that must be preserved.
-    data: yup.mixed().default({})
+    data: yup.mixed().default({}),
+    pinnedAt: yup.number().optional(),
+    disabled: yup.boolean().optional(),
+    collapsed: yup.boolean().optional(),
+    isDefault: yup.boolean().optional()
 });
 
 const connectionSchema = yup.object({

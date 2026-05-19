@@ -23,6 +23,7 @@ export const ChromaNode = React.memo(({ node, onUpdate, input }: ChromaNodeProps
         clipBlack: 0,
         clipWhite: 0,
         blur: 0,
+        blurContrast: 0,
         invert: false,
         ...config
     };
@@ -65,7 +66,10 @@ export const ChromaNode = React.memo(({ node, onUpdate, input }: ChromaNodeProps
                             <Slider label="Clip Black" min={0} max={100} value={safeConfig.clipBlack} onChange={(v) => update({clipBlack:v})} accent="purple" />
                             <Slider label="Clip White" min={0} max={100} value={safeConfig.clipWhite} onChange={(v) => update({clipWhite:v})} accent="purple" />
                         </div>
-                        <Slider label="Edge Blur" min={0} max={10} step={0.5} value={safeConfig.blur || 0} onChange={(v) => update({blur:v})} accent="purple" />
+                        <div className="grid grid-cols-2 gap-3">
+                            <Slider label="Blur Radius" min={0} max={10} step={0.5} value={safeConfig.blur || 0} onChange={(v) => update({blur:v})} accent="purple" />
+                            <Slider label="Blur Contrast" min={0} max={100} step={1} value={safeConfig.blurContrast || 0} onChange={(v) => update({blurContrast:v})} accent="purple" />
+                        </div>
                 </Section>
 
                 {!safeConfig.invert && (

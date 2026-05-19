@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState, useRef } from 'react';
 import { AnimationEntry, NodePreviewData, ImageSource } from '../types';
-import { Play, Pause, SkipBack, SkipForward } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward, PaintBucket } from 'lucide-react';
 import { BitmapView } from './common/BitmapView';
 
 interface AnimationPreviewProps {
@@ -24,6 +24,7 @@ const AnimationPreview: React.FC<AnimationPreviewProps> = ({
   const { isPlaying, fps, loop, currentFrame } = timelineSettings;
 
   const [currentFrameIndex, setCurrentFrameIndex] = useState(0);
+  const [bgColor, setBgColor] = useState<string>('transparent');
   const timerRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -69,7 +70,7 @@ const AnimationPreview: React.FC<AnimationPreviewProps> = ({
         src = previewData.data;
       }
 
-      if (!src) return <span className="text-txt-muted text-sm font-medium">Empty Output</span>;
+      if (!src) return <span className="text-txt-muted text-sm font-medium mix-blend-difference">Empty Output</span>;
 
       return (
         <BitmapView
@@ -79,14 +80,36 @@ const AnimationPreview: React.FC<AnimationPreviewProps> = ({
         />
       );
     }
-    return <span className="text-txt-muted text-sm font-medium">No Signal</span>;
+    return <span className="text-txt-muted text-sm font-medium mix-blend-difference">No Signal</span>;
   };
 
+  const bgStyle = bgColor === 'transparent' ? {} : { backgroundColor: bgColor };
+
   return (
-    <div className="flex flex-col bg-panel/40 backdrop-blur-md rounded-2xl border border-border-base/10 overflow-hidden shadow-xl w-full ring-1 ring-black/5 dark:ring-black/20">
+    <div className="flex flex-col bg-panel/40 backdrop-blur-md rounded-2xl border border-border-base/10 overflow-hidden shadow-xl w-full ring-1 ring-black/5 dark:ring-black/20 relative">
+
+      <div className="absolute top-2 right-2 z-10 flex items-center bg-black/60 backdrop-blur-md rounded border border-white/10 overflow-hidden">
+          <button 
+              onClick={() => setBgColor('transparent')}
+              className={`w-6 h-6 flex items-center justify-center text-white/70 hover:text-white hover:bg-white/20 transition-colors ${bgColor === 'transparent' ? 'bg-white/20' : ''}`}
+              title="Transparent Background"
+          >
+              <div className="w-3.5 h-3.5 checkerboard rounded-sm border border-white/30" />
+          </button>
+          <div className="relative w-6 h-6 flex items-center justify-center text-white/70 hover:text-white hover:bg-white/20 transition-colors cursor-pointer" title="Solid Color Background">
+              <PaintBucket size={14} />
+              <input 
+                  type="color" 
+                  className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" 
+                  value={bgColor === 'transparent' ? '#000000' : bgColor}
+                  onChange={(e) => setBgColor(e.target.value)}
+              />
+          </div>
+      </div>
 
       <div
-        className="w-full bg-black/5 dark:bg-black/40 checkerboard relative overflow-hidden flex items-center justify-center h-[280px] shadow-inner"
+        className={`w-full relative overflow-hidden flex items-center justify-center h-[280px] shadow-inner ${bgColor === 'transparent' ? 'bg-black/5 dark:bg-black/40 checkerboard' : ''}`}
+        style={bgStyle}
       >
         <div className="w-full h-full flex items-center justify-center">
           {renderContent()}

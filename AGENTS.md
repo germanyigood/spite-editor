@@ -11,6 +11,9 @@ You **MUST** use `data-testid` attributes on interactive or queryable HTML eleme
 
 Always update the React components to include `data-testid` attributes before trying to target them in tests.
 
+## Запуск E2E тестов (ЗАПРЕЩЕНО)
+Вам **СТРОГО ЗАПРЕЩЕНО** пытаться запускать E2E тесты самостоятельно (через скрипты, браузерные автоматизаторы, playwright, puppeteer и т.д.). E2E тесты запускаются исключительно пользователем вручную. Никогда не тратьте время на их автоматический запуск или написание краулеров.
+
 ## Правила именования коммитов (Conventional Commits & SemVer)
 
 Все коммиты должны строго следовать спецификации Conventional Commits, что позволяет автоматизировать управление версиями по принципам Семантического Версионирования (SemVer).

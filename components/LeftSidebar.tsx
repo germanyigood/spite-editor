@@ -7,10 +7,11 @@ import { useProject } from '../context/ProjectContext';
 import { createDefaultGraph } from '../context/ProjectContext';
 import { Frame, SpriteConfig } from '../types';
 import { getGraphLayers, generateGridFrames } from '../utils';
+import { ExportType } from './panels/ExportPanel';
 
 interface LeftSidebarProps {
   onImportFile: (file: File) => void;
-  onExport: (type: 'download' | 'clipboard' | 'json' | 'ts' | 'project' | 'zip-ts' | 'images') => void;
+  onExport: (type: ExportType, packAsArchive?: boolean) => void;
   copySuccess: boolean;
 }
 

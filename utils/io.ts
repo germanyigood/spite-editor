@@ -56,3 +56,20 @@ export const stitchFrames = async (frames: string[]): Promise<Blob | null> => {
   images.forEach(img => { ctx.drawImage(img, x, 0); x += img.naturalWidth; });
   return new Promise(r => c.toBlob(r, 'image/png'));
 };
+
+const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
+
+export const downloadMultipleFilesSeq = async (files: { filename: string; blob: Blob }[]) => {
+    for (const file of files) {
+        const url = URL.createObjectURL(file.blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = file.filename;
+        document.body.appendChild(a); // Append for reliable trigger in some browsers
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        // Wait between downloads to bypass browser multiple-download block prevention
+        await delay(300);
+    }
+};

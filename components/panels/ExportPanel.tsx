@@ -32,7 +32,7 @@ const ExportPanel: React.FC<ExportPanelProps> = ({ onExport, disabled }) => {
            {/* Primary Button: Save Project */}
            <button 
               onClick={() => onExport('project')} 
-              className="flex-1 flex justify-center items-center py-3 bg-gradient-to-r from-surface to-surface hover:from-surface-hover/20 hover:to-surface-hover/10 text-xs text-indigo-700 dark:text-indigo-300 hover:text-indigo-800 dark:hover:text-indigo-200 gap-2 transition-all w-full leading-none"
+              className="flex-1 flex justify-center items-center py-3 bg-gradient-to-r from-surface to-surface hover:from-indigo-600 hover:to-indigo-500 dark:hover:from-indigo-500/20 dark:hover:to-indigo-500/10 text-xs text-indigo-700 dark:text-indigo-300 hover:text-white dark:hover:text-indigo-100 gap-2 transition-all w-full leading-none shadow-sm dark:shadow-none hover:shadow-md"
            >
                <Save size={16} /><span>Save Project</span>
            </button>
@@ -43,7 +43,7 @@ const ExportPanel: React.FC<ExportPanelProps> = ({ onExport, disabled }) => {
                 e.stopPropagation();
                 setMenuOpen(!menuOpen);
               }}
-              className={`px-3 border-l border-indigo-500/30 flex items-center justify-center transition-all ${menuOpen ? 'bg-indigo-500/20 text-indigo-800 dark:text-indigo-200' : 'bg-surface hover:bg-surface-hover/40 text-indigo-700 dark:text-indigo-300 hover:text-indigo-800 dark:hover:text-indigo-200'}`}
+              className={`px-3 border-l border-indigo-500/30 flex items-center justify-center transition-all ${menuOpen ? 'bg-indigo-600 text-white dark:bg-indigo-500/20 dark:text-indigo-200' : 'bg-surface hover:bg-indigo-600 hover:text-white dark:hover:bg-surface-hover/40 text-indigo-700 dark:text-indigo-300 dark:hover:text-indigo-200'}`}
               title="More Export Options"
            >
                <ChevronDown size={16} className={`transition-transform duration-200 ${menuOpen ? 'rotate-180' : ''}`} />

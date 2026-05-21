@@ -168,8 +168,10 @@ const LayoutEditor: React.FC<LayoutEditorProps> = ({ nodeOutputs }) => {
     }, [localTool, currentAnim, dispatch]);
 
     const handleCanvasDown = (e: React.MouseEvent) => {
-        if (e.button === 1 || e.shiftKey) {
+        const isBackgroundFormClick = e.target === e.currentTarget || (e.target as HTMLElement).closest('.checkerboard');
+        if (e.button === 1 || e.shiftKey || (e.button === 0 && isBackgroundFormClick)) {
             dragRef.current = { mode: 'pan', startX: e.clientX, startY: e.clientY };
+            dispatch({ type: 'SELECT_LAYOUT_ELEMENT', payload: null });
             return;
         }
 
@@ -178,8 +180,13 @@ const LayoutEditor: React.FC<LayoutEditorProps> = ({ nodeOutputs }) => {
             dragRef.current = { mode: 'create', startX: e.clientX, startY: e.clientY, initialCursor: pos };
             setTempCreateRect({ x: pos.x, y: pos.y, w: 0, h: 0 });
             dispatch({ type: 'SELECT_LAYOUT_ELEMENT', payload: null }); 
-        } else {
+        } else if (isBackgroundFormClick || (e.target as HTMLElement).closest('[data-testid="infinite-canvas"]')) {
             dispatch({ type: 'SELECT_LAYOUT_ELEMENT', payload: null });
+            
+            // Allow panning by left click dragged on any non-element
+            if (!dragRef.current || dragRef.current.mode !== 'layer') {
+                 dragRef.current = { mode: 'pan', startX: e.clientX, startY: e.clientY };
+            }
         }
     };
 

@@ -39,16 +39,6 @@ export const InfiniteCanvas = forwardRef<HTMLDivElement, InfiniteCanvasProps>(({
     const handleWheel = (e: React.WheelEvent) => {
         e.preventDefault();
         
-        // On Mac Trackpad: two-finger swipe has ctrlKey=false and generates deltaX/deltaY for panning.
-        // Pinch-to-zoom has ctrlKey=true and generates deltaY for zooming.
-        if (!e.ctrlKey) {
-            // Trackpad Pan / Mouse wheel vertical pan
-            const newX = transform.x - e.deltaX;
-            const newY = transform.y - e.deltaY;
-            onChange({ x: newX, y: newY, scale: transform.scale });
-            return;
-        }
-
         // Calculate new scale additively for robustness against huge deltaY from trackpads
         const newScale = Math.min(maxScale, Math.max(minScale, transform.scale - e.deltaY * 0.003));
         

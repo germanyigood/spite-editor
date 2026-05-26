@@ -10,10 +10,17 @@ import { grid_slicing_workflow } from './scenarios/grid_slicing';
 import { selection_extract_workflow } from './scenarios/selection_extract';
 import { timeline_playback_workflow } from './scenarios/timeline_playback';
 import { timeline_frames_workflow } from './scenarios/timeline_frames';
-import { paint_node_workflow } from './scenarios/paint_node_workflow';
+import { timeline_advanced_workflow } from './scenarios/timeline_advanced';
+import { node_context_menu_workflow } from './scenarios/node_context_menu';
+import { draw_brush_workflow } from './scenarios/draw_brush_workflow';
+import { draw_eraser_workflow } from './scenarios/draw_eraser_workflow';
+import { draw_bucket_workflow } from './scenarios/draw_bucket_workflow';
+import { draw_rect_workflow } from './scenarios/draw_rect_workflow';
+import { draw_ellipse_workflow } from './scenarios/draw_ellipse_workflow';
+import { draw_path_workflow } from './scenarios/draw_path_workflow';
+import { vector_tools_workflow } from './scenarios/vector_tools_workflow';
 import { chroma_key_workflow } from './scenarios/chroma_key_workflow';
 import { undo_redo_workflow } from './scenarios/undo_redo_workflow';
-import { node_context_menu_workflow } from './scenarios/node_context_menu';
 
 export const E2E_SCENARIOS: E2EScenario[] = [
     selection_extract_workflow,
@@ -27,7 +34,14 @@ export const E2E_SCENARIOS: E2EScenario[] = [
     animation_management,
     timeline_playback_workflow,
     timeline_frames_workflow,
-    paint_node_workflow,
+    timeline_advanced_workflow,
+    draw_brush_workflow,
+    draw_eraser_workflow,
+    draw_bucket_workflow,
+    draw_rect_workflow,
+    draw_ellipse_workflow,
+    draw_path_workflow,
+    vector_tools_workflow,
     chroma_key_workflow,
     undo_redo_workflow
 ];

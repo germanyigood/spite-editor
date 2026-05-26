@@ -57,7 +57,7 @@ const LayoutEditor: React.FC<LayoutEditorProps> = ({ nodeOutputs }) => {
     const [playbackIndex, setPlaybackIndex] = useState(0);
 
     const outputInfo = useMemo(() => {
-        const outputNode = currentAnim?.nodeGraph.nodes.find(n => n.type === 'output');
+        const outputNode = currentAnim?.nodeGraph?.nodes?.find(n => n.type === 'output');
         const payload = outputNode ? nodeOutputs[outputNode.id] : null;
         
         let width = 800;
@@ -143,7 +143,7 @@ const LayoutEditor: React.FC<LayoutEditorProps> = ({ nodeOutputs }) => {
     };
 
     const handleBoxDown = useCallback((e: React.MouseEvent, id: string | number, handle?: string) => {
-        if (e.button === 1 || e.shiftKey) {
+        if (e.button === 1 || e.ctrlKey || (e.button === 0 && e.shiftKey) || (e.button === 2 && e.ctrlKey)) {
             dragRef.current = { mode: 'pan', startX: e.clientX, startY: e.clientY };
             return;
         }
@@ -169,7 +169,9 @@ const LayoutEditor: React.FC<LayoutEditorProps> = ({ nodeOutputs }) => {
 
     const handleCanvasDown = (e: React.MouseEvent) => {
         const isBackgroundFormClick = e.target === e.currentTarget || (e.target as HTMLElement).closest('.checkerboard');
-        if (e.button === 1 || e.shiftKey || (e.button === 0 && isBackgroundFormClick)) {
+        const isPanClick = e.button === 1 || e.ctrlKey || (e.button === 0 && e.shiftKey) || (e.button === 2 && e.ctrlKey);
+        
+        if (isPanClick) {
             dragRef.current = { mode: 'pan', startX: e.clientX, startY: e.clientY };
             dispatch({ type: 'SELECT_LAYOUT_ELEMENT', payload: null });
             return;
@@ -183,10 +185,8 @@ const LayoutEditor: React.FC<LayoutEditorProps> = ({ nodeOutputs }) => {
         } else if (isBackgroundFormClick || (e.target as HTMLElement).closest('[data-testid="infinite-canvas"]')) {
             dispatch({ type: 'SELECT_LAYOUT_ELEMENT', payload: null });
             
-            // Allow panning by left click dragged on any non-element
-            if (!dragRef.current || dragRef.current.mode !== 'layer') {
-                 dragRef.current = { mode: 'pan', startX: e.clientX, startY: e.clientY };
-            }
+            // Allow panning by spacebar/middle click, but not pure left click on background anymore. 
+            // We removed pure left click panning so it matches user expectations (only middle click/ctrl+click).
         }
     };
 
@@ -276,7 +276,7 @@ const LayoutEditor: React.FC<LayoutEditorProps> = ({ nodeOutputs }) => {
                     {outputInfo.image && <BitmapView image={outputInfo.image} mode="natural" className="w-full h-full select-none pixelated" />}
                 </div>
 
-                {currentAnim?.layout.elements.map(el => {
+                {(currentAnim?.layout?.elements || []).map(el => {
                     if (!el.visible) return null;
                     const isSelected = selectedLayoutElementId === el.id;
                     const isDragging = dragRef.current?.targetId === el.id;

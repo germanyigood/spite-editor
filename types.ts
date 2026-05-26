@@ -92,7 +92,8 @@ export interface PaintConfig {
     brushColor: string;
     brushOpacity: number;
     brushHardness: number; // 0 = Hard, 1 = Soft
-    isEraser: boolean;
+    isEraser: boolean; // Deprecated by drawTool, but kept for compatibility
+    drawTool?: 'brush' | 'eraser' | 'bucket' | 'rect' | 'ellipse' | 'path' | 'path-select' | 'path-add' | 'path-delete' | 'path-convert';
     paintData?: string; // Base64 of the painted layer
     sourceSrc?: string; // The source image string this paint data is based on
 }
@@ -150,7 +151,7 @@ export interface ExportConfig {
 
 // --- Node Types (Discriminated Union) ---
 
-export type NodeType = 'source' | 'chroma' | 'grid' | 'normal_map' | 'timeline' | 'crop' | 'output' | 'seamless' | 'color_correct' | 'resize' | 'frame_normalize' | 'optimize' | 'outline' | 'drop_shadow' | 'generate' | 'composite' | 'fill_color' | 'paint' | 'warp' | 'pixelize' | 'frame_skip';
+export type NodeType = 'source' | 'chroma' | 'grid' | 'normal_map' | 'timeline' | 'crop' | 'output' | 'seamless' | 'color_correct' | 'resize' | 'frame_normalize' | 'optimize' | 'outline' | 'drop_shadow' | 'generate' | 'composite' | 'fill_color' | 'paint' | 'warp' | 'pixelize' | 'frame_skip' | 'vector';
 
 interface BaseNode {
     id: string;
@@ -262,6 +263,7 @@ export interface TimelineNode extends BaseNode {
         isPlaying: boolean;
         currentFrame: number; // The static cursor position
         frames: number[]; // Indices referencing the Grid
+        mutedIndices?: number[]; // Indices of frames that are muted
     };
 }
 
@@ -310,7 +312,33 @@ export interface SeamlessNode extends BaseNode {
     };
 }
 
-export type NodeData = SourceNode | GridNode | ChromaNode | TimelineNode | OutputNode | NormalMapNode | CropNode | SeamlessNode | ColorCorrectNode | ResizeNode | FrameNormalizeNode | OptimizeNode | OutlineNode | DropShadowNode | GenerateNode | CompositeNode | FillNode | PaintNode | WarpNode | PixelizeNode;
+export interface FrameSkipNode extends BaseNode {
+    type: 'frame_skip';
+    data: {
+        keepEvery: number;
+        offset: number;
+    };
+}
+
+export interface VectorPath {
+    id: string;
+    points: { x: number, y: number, cp1x?: number, cp1y?: number, cp2x?: number, cp2y?: number, broken?: boolean }[];
+    closed: boolean;
+    fill: string;
+    stroke: string;
+    strokeWidth: number;
+}
+
+export interface VectorNode extends BaseNode {
+    type: 'vector';
+    data: {
+        paths: VectorPath[];
+        width: number;
+        height: number;
+    };
+}
+
+export type NodeData = SourceNode | GridNode | ChromaNode | TimelineNode | OutputNode | NormalMapNode | CropNode | SeamlessNode | ColorCorrectNode | ResizeNode | FrameNormalizeNode | OptimizeNode | OutlineNode | DropShadowNode | GenerateNode | CompositeNode | FillNode | PaintNode | WarpNode | PixelizeNode | FrameSkipNode | VectorNode;
 
 // --- Connection Types ---
 
@@ -380,6 +408,7 @@ export interface PayloadTimeline {
     image: ImageSource; // The current frame image to display
     frames: ImageSource[]; // Ordered list of Frame Images
     framesMetadata?: Frame[]; // Ordered list of Frame Metadata matching the frames array
+    unmutedMap?: number[]; // Maps unmuted frame index back to the global frames array index
 }
 
 // 4. Optimization Settings Payload

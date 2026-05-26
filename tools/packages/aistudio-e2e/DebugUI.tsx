@@ -189,7 +189,7 @@ export const E2EDebugUI: React.FC<DebugUIProps> = ({
                                     <div className="px-12 pb-4 space-y-4 animate-in slide-in-from-top-2 duration-200">
                                         <div className="space-y-1.5 opacity-60">
                                             <div className="flex items-center gap-2 text-[9px] font-bold uppercase tracking-widest text-txt-muted mb-2"><Settings2 size={10} /> Prerequisites</div>
-                                            {s.setup.map((step, idx) => {
+                                            {(s.setup || []).map((step, idx) => {
                                                 const res = scenarioState.setup[idx] || { status: 'pending' as StepStatus };
                                                 return (<div key={`setup-${idx}`} className="flex items-center gap-3"><div className="shrink-0">{getStepIcon(res.status, true)}</div><span className="text-[11px] text-txt-secondary italic">{step.name}</span></div>);
                                             })}
@@ -197,7 +197,7 @@ export const E2EDebugUI: React.FC<DebugUIProps> = ({
                                         <div className="h-px bg-border-base/5" />
                                         <div className="space-y-2">
                                             <div className={`flex items-center gap-2 text-[9px] font-bold uppercase tracking-widest mb-2 transition-colors duration-500 ${isRunning ? 'text-blue-500' : 'text-purple-500'}`}><Play size={10} /> Test Logic</div>
-                                            {s.steps.map((step, idx) => {
+                                            {(s.steps || []).map((step, idx) => {
                                                 const res = scenarioState.steps[idx] || { status: 'pending' as StepStatus };
                                                 return (
                                                     <div key={`step-${idx}`} className="flex flex-col gap-1">

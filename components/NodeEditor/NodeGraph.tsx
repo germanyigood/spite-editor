@@ -2,7 +2,7 @@
 import React, { useRef, memo, useMemo, useState, useEffect } from 'react';
 import { useProject } from '../../context/ProjectContext';
 import { NodeData, Connection, NodePayload, NodeType } from '../../types';
-import { Image as ImageIcon, Cable, Trash2, Sparkles, Brush, Grid3X3, CircuitBoard, PaintBucket, ImagePlus, Palette, CircleDashed, Layers, Scissors, Lightbulb, Film, Crop, Scaling, Gauge, MonitorUp, FastForward } from 'lucide-react';
+import { Image as ImageIcon, Cable, Trash2, Sparkles, Brush, Grid3X3, CircuitBoard, PaintBucket, ImagePlus, Palette, CircleDashed, Layers, Scissors, Lightbulb, Film, Crop, Scaling, Gauge, MonitorUp, FastForward, PenTool } from 'lucide-react';
 
 // Logic & Data
 import { useGraphInteraction } from './hooks/useGraphInteraction';
@@ -120,9 +120,9 @@ const NodeGraph: React.FC<NodeGraphProps> = ({ visible = true, nodeOutputs }) =>
     const containerRef = useRef<HTMLDivElement>(null);
 
     // --- SINGLE SOURCE OF TRUTH ---
-    const rawNodes = currentAnim?.nodeGraph.nodes || [];
-    const connections = currentAnim?.nodeGraph.connections || [];
-    const rawTransform = currentAnim?.nodeGraph.viewport || { x: 0, y: 0, scale: 1 };
+    const rawNodes = currentAnim?.nodeGraph?.nodes || [];
+    const connections = currentAnim?.nodeGraph?.connections || [];
+    const rawTransform = currentAnim?.nodeGraph?.viewport || { x: 0, y: 0, scale: 1 };
 
     const {
         dragState,
@@ -203,6 +203,7 @@ const NodeGraph: React.FC<NodeGraphProps> = ({ visible = true, nodeOutputs }) =>
             [
                 { type: 'generate', label: 'AI Sprite Gen', icon: Sparkles, colorClass: 'text-purple-500 dark:text-purple-400' },
                 { type: 'paint', label: 'Paint', icon: Brush, colorClass: 'text-purple-500 dark:text-purple-400' },
+                { type: 'vector', label: 'Vector Path', icon: PenTool, colorClass: 'text-fuchsia-500 dark:text-fuchsia-400' },
                 { type: 'pixelize', label: 'Smart Pixelize', icon: Grid3X3, colorClass: 'text-cyan-600 dark:text-cyan-400' }
             ],
             [

@@ -37,7 +37,7 @@ export const FrameOverlay: React.FC<FrameOverlayProps> = ({
 
     return (
         <div className="absolute pointer-events-none" style={{ left: layerX, top: layerY }}>
-            {activeConfig.frames.map((frame, i) => {
+            {(activeConfig?.frames || []).map((frame, i) => {
                  const isSelected = selectedFrameIndex === i;
                  const effectiveFrame = (isSelected && visualFrame) ? visualFrame : frame;
 

@@ -48,37 +48,43 @@ export const processTimeline: NodeProcessor = async (node, inputs, _context) => 
     // Map logical indices (stored in node.data.frames) to actual bitmap data AND metadata
     const validFrames: ImageSource[] = [];
     const validMetadata: Frame[] = [];
+    const unmutedMap: number[] = [];
 
     const frameIndices = node.data.frames || [];
-    
-    // NORMALIZE INDICES:
-    // We map requested indices directly to the available frames. If the request is out of bounds
-    // (e.g. gaps in global indices due to unconnected grids), we gracefully clamp or safely find the frame.
-    const minIndex = frameIndices.length > 0 ? Math.min(...frameIndices) : 0;
+    const mutedIndices = node.data.mutedIndices || [];
 
+    let unmutedCurrentFrameIndex = 0;
+    let currentUnmutedCount = 0;
+
+    // NORMALIZE INDICES:
+    // We map requested indices directly to the available frames.
     frameIndices.forEach((globalIdx, countIdx) => {
-        let localIdx = globalIdx - minIndex;
+        let localIdx = globalIdx;
         
         // If due to gaps (e.g. Grid2 is unconnected) localIdx overshoots, we safely fallback to the raw index count
         if (localIdx < 0 || localIdx >= allAvailableFrames.length) {
             localIdx = countIdx % allAvailableFrames.length; 
         }
         
-        if (allAvailableFrames[localIdx]) {
+        const isMuted = mutedIndices.includes(countIdx);
+        
+        if (!isMuted && allAvailableFrames[localIdx]) {
+            if (countIdx === (node.data.currentFrame || 0)) {
+                unmutedCurrentFrameIndex = currentUnmutedCount;
+            }
             validFrames.push(allAvailableFrames[localIdx]);
             validMetadata.push(allAvailableMetadata[localIdx] || { id: localIdx, x:0, y:0, width:0, height:0, name: `Frame ${localIdx}` });
+            unmutedMap.push(countIdx);
+            currentUnmutedCount++;
+        } else if (isMuted && countIdx === (node.data.currentFrame || 0)) {
+            // Unfortunate: playhead is on a muted frame. Let's just point to previous unmuted frame
+            unmutedCurrentFrameIndex = Math.max(0, currentUnmutedCount - 1);
         }
     });
     
-    // Adjust currentFrame to be local for the payload, so downstream/preview knows which index of 'frames' to show
-    let currentGlobalFrame = node.data.currentFrame || 0;
-    
-    // Clamp global frame to valid range of indices this node knows about
-    if (!frameIndices.includes(currentGlobalFrame) && frameIndices.length > 0) {
-        currentGlobalFrame = frameIndices[0];
-    }
-    
-    const localCurrentFrame = Math.max(0, currentGlobalFrame - minIndex);
+    // In the UI, node.data.currentFrame is the LOCAL array index (0 to frames.length - 1).
+    // Not a global frame ID. So we just bounds-check it directly.
+    const localCurrentFrame = Math.max(0, Math.min(unmutedCurrentFrameIndex, validFrames.length - 1));
     
     // The 'image' property of a TIMELINE payload should represent the context for preview/resize.
     // We prioritize the specific frame image to represent the node's current visual output.
@@ -93,6 +99,7 @@ export const processTimeline: NodeProcessor = async (node, inputs, _context) => 
         currentFrameIndex: localCurrentFrame,
         frames: validFrames,
         framesMetadata: validMetadata,
+        unmutedMap: unmutedMap,
         image: contextImage 
     };
 };

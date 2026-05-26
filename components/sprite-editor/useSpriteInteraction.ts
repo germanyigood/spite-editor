@@ -70,7 +70,13 @@ export const useSpriteInteraction = (
     }, []);
 
     const handleMouseDown = (e: React.MouseEvent) => {
-        if (e.button === 1 || (e.button === 0 && isSpacePressed.current) || (e.button === 0 && e.target === e.currentTarget)) {
+        const isSelectionMode = toolMode === 'draw' && onSelectionChange;
+        const isPanClick = e.button === 1 || 
+                           (e.button === 0 && isSpacePressed.current) || 
+                           (e.button === 0 && e.ctrlKey) || 
+                           (e.button === 2 && e.ctrlKey);
+
+        if (isPanClick) {
             setIsPanning(true);
             dragRef.current = { startX: e.clientX, startY: e.clientY, mode: 'pan' };
             return;

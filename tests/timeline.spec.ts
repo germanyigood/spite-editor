@@ -105,7 +105,7 @@ export const defineTimelineSpecs = () => {
                   id: 'timeline', type: 'timeline', x:0, y:0, width:100, height:100,
                   data: { 
                       frames: [10, 11, 12], 
-                      fps: 12, loop: true, isPlaying: false, currentFrame: 11 // Cursor at middle frame
+                      fps: 12, loop: true, isPlaying: false, currentFrame: 1 // Cursor at middle frame
                   }
               };
 

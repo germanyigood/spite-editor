@@ -11,7 +11,7 @@ import { SelectionOverlay } from './sprite-editor/SelectionOverlay';
 import { InfiniteCanvas } from './common/InfiniteCanvas';
 
 // Icons
-import { Brush, Eraser, BoxSelect } from 'lucide-react';
+import { Brush, Eraser, BoxSelect, PaintBucket, Square, Circle, PenTool, MousePointer2, Plus, Minus, CornerUpRight } from 'lucide-react';
 import { ColorPicker, Slider } from './common/DesignSystem';
 
 interface SpriteEditorProps {
@@ -33,26 +33,34 @@ const SpriteEditor: React.FC<SpriteEditorProps> = ({ nodeOutputs = {}, style, cl
       return findModifierByType(entry.nodeGraph, activeLayerId, 'paint') as PaintNode | undefined;
   }, [entry?.nodeGraph, activeLayerId]);
 
+  const vectorNode = useMemo(() => {
+    if (!entry || !activeLayerId) return undefined;
+    return findModifierByType(entry.nodeGraph, activeLayerId, 'vector') as any | undefined;
+  }, [entry?.nodeGraph, activeLayerId]);
+
   const warpNode = useMemo(() => {
       if (!entry || !activeLayerId) return undefined;
       return findModifierByType(entry.nodeGraph, activeLayerId, 'warp') as WarpNode | undefined;
   }, [entry?.nodeGraph, activeLayerId]);
 
-  const [drawTool, setDrawTool] = useState<'brush' | 'eraser' | 'select'>('brush');
+  const [drawTool, setDrawTool] = useState<'brush' | 'eraser' | 'select' | 'bucket' | 'rect' | 'ellipse' | 'path' | 'path-select' | 'path-add' | 'path-delete' | 'path-convert'>('brush');
   const [selectionRect, setSelectionRect] = useState<{x:number, y:number, w:number, h:number} | null>(null);
 
   const [brushSettings, setBrushSettings] = useState<PaintConfig>({
-      brushSize: 20, brushColor: '#000000', brushOpacity: 1.0, brushHardness: 0.8, isEraser: false
+      brushSize: 20, brushColor: '#000000', brushOpacity: 1.0, brushHardness: 0.8, isEraser: false, drawTool: 'brush'
   });
 
   // Синхронизация локального состояния инструмента с данными ноды
   useEffect(() => {
       if(paintNode) {
           setBrushSettings(prev => ({ ...prev, ...paintNode.data }));
-          if (paintNode.data.isEraser) setDrawTool('eraser');
-          else if (drawTool === 'eraser') setDrawTool('brush');
+          if (paintNode.data.drawTool && paintNode.data.drawTool !== drawTool) {
+              setDrawTool(paintNode.data.drawTool);
+          } else if (paintNode.data.isEraser && drawTool !== 'eraser') {
+              setDrawTool('eraser');
+          }
       }
-  }, [paintNode?.id, paintNode?.data.isEraser]);
+  }, [paintNode?.id, paintNode?.data.isEraser, paintNode?.data.drawTool]);
 
   const [cursorPos, setCursorPos] = useState<{x: number, y: number} | null>(null);
   const [isHoveringEditor, setIsHoveringEditor] = useState(false);
@@ -86,10 +94,33 @@ const SpriteEditor: React.FC<SpriteEditorProps> = ({ nodeOutputs = {}, style, cl
       dispatch({ type: 'UPDATE_NODE_DATA', payload: { animId: entry.id, nodeId: paintNode.id, data: updates } });
   };
 
-  const setLocalDrawTool = (tool: 'brush' | 'eraser' | 'select') => {
+  const setLocalDrawTool = (tool: 'brush' | 'eraser' | 'select' | 'bucket' | 'rect' | 'ellipse' | 'path' | 'path-select' | 'path-add' | 'path-delete' | 'path-convert') => {
       setDrawTool(tool);
       if (tool !== 'select') {
-          updatePaintNode({ isEraser: tool === 'eraser' });
+          updatePaintNode({ isEraser: tool === 'eraser', drawTool: tool as any });
+      }
+
+      if (tool === 'path' && !vectorNode && paintNode && activeLayerId && entry) {
+          const ts = Date.now();
+          const vectorId = `vector_${ts}`;
+          const newVectorNode = {
+              id: vectorId, type: 'vector', isDefault: true,
+              x: paintNode.x + 220, y: paintNode.y, width: 220, height: 280,
+              data: { paths: [] }
+          };
+          
+          let newGraph = { ...entry.nodeGraph };
+          newGraph.nodes = [...newGraph.nodes, newVectorNode as any];
+          
+          const outConnIndex = newGraph.connections.findIndex(c => c.source === paintNode.id);
+          if (outConnIndex !== -1) {
+              const oldTarget = newGraph.connections[outConnIndex].target;
+              newGraph.connections = [...newGraph.connections];
+              newGraph.connections[outConnIndex] = { ...newGraph.connections[outConnIndex], target: vectorId };
+              newGraph.connections.push({ id: `c_${vectorId}_${oldTarget}`, source: vectorId, target: oldTarget });
+          }
+          
+          dispatch({ type: 'UPDATE_NODE_GRAPH', payload: { animId: entry.id, graph: newGraph }});
       }
   };
 
@@ -183,7 +214,7 @@ const SpriteEditor: React.FC<SpriteEditorProps> = ({ nodeOutputs = {}, style, cl
       }
   }, [selectionRect, activeSource, entry, nodeOutputs, paintNode, dispatch]);
 
-  const cursorStyle = isPanning ? 'cursor-grabbing' : (toolMode === 'draw' && (drawTool === 'brush' || drawTool === 'eraser') ? 'cursor-none' : 'cursor-default');
+  const cursorStyle = isPanning ? 'cursor-grabbing' : (toolMode === 'draw' && (drawTool === 'brush' || drawTool === 'eraser' || drawTool === 'bucket' || drawTool === 'rect' || drawTool === 'ellipse' || (drawTool && drawTool.startsWith('path'))) ? 'cursor-none' : 'cursor-default');
 
   return (
     <div className={`w-full h-full relative ${className || ''}`} style={style}>
@@ -215,6 +246,7 @@ const SpriteEditor: React.FC<SpriteEditorProps> = ({ nodeOutputs = {}, style, cl
                         drawTool={drawTool}
                         nodeOutputs={nodeOutputs}
                         overridePos={override}
+                        scale={transform.scale}
                     />
                 );
             })}
@@ -251,22 +283,54 @@ const SpriteEditor: React.FC<SpriteEditorProps> = ({ nodeOutputs = {}, style, cl
                 }}
             />
         )}
+        
+        {toolMode === 'draw' && isHoveringEditor && (drawTool === 'bucket' || drawTool === 'rect' || drawTool === 'ellipse' || (drawTool && drawTool.startsWith('path'))) && cursorPos && (
+            <div 
+                className={`absolute pointer-events-none z-[1000]`}
+                style={{ 
+                    left: cursorPos.x, top: cursorPos.y, 
+                    transform: 'translate(4px, 4px)' 
+                }}
+            >
+                {drawTool === 'bucket' && <PaintBucket size={16} className="text-white drop-shadow-md" />}
+                {drawTool === 'rect' && <Square size={16} className="text-white drop-shadow-md" />}
+                {drawTool === 'ellipse' && <Circle size={16} className="text-white drop-shadow-md" />}
+                {drawTool && drawTool.startsWith('path') && <PenTool size={16} className="text-white drop-shadow-md" />}
+            </div>
+        )}
 
         {toolMode === 'draw' && (
             <div className="absolute bottom-10 left-1/2 -translate-x-1/2 flex items-center gap-2 p-2 bg-panel/90 backdrop-blur-2xl rounded-2xl border border-white/10 shadow-2xl z-[100] animate-in slide-in-from-bottom-5">
                 <div className="flex bg-surface/50 p-1 rounded-xl gap-1">
                     <button data-testid="draw-tool-brush" onClick={() => setLocalDrawTool('brush')} className={`p-2 rounded-lg transition-all ${drawTool === 'brush' ? 'bg-pink-600 text-white shadow-lg' : 'text-txt-secondary hover:text-white'}`} title="Brush Tool (B)"><Brush size={18} /></button>
                     <button data-testid="draw-tool-eraser" onClick={() => setLocalDrawTool('eraser')} className={`p-2 rounded-lg transition-all ${drawTool === 'eraser' ? 'bg-red-600 text-white shadow-lg shadow-red-900/40' : 'text-txt-secondary hover:text-white'}`} title="Eraser Tool (E)"><Eraser size={18} /></button>
+                    <button data-testid="draw-tool-bucket" onClick={() => setLocalDrawTool('bucket')} className={`p-2 rounded-lg transition-all ${drawTool === 'bucket' ? 'bg-pink-600 text-white shadow-lg' : 'text-txt-secondary hover:text-white'}`} title="Paint Bucket (G)"><PaintBucket size={18} /></button>
+                    <button data-testid="draw-tool-rect" onClick={() => setLocalDrawTool('rect')} className={`p-2 rounded-lg transition-all ${drawTool === 'rect' ? 'bg-pink-600 text-white shadow-lg' : 'text-txt-secondary hover:text-white'}`} title="Rectangle Tool (U)"><Square size={18} /></button>
+                    <button data-testid="draw-tool-ellipse" onClick={() => setLocalDrawTool('ellipse')} className={`p-2 rounded-lg transition-all ${drawTool === 'ellipse' ? 'bg-pink-600 text-white shadow-lg' : 'text-txt-secondary hover:text-white'}`} title="Ellipse Tool (O)"><Circle size={18} /></button>
+                    <button data-testid="draw-tool-path" onClick={() => setLocalDrawTool('path')} className={`p-2 rounded-lg transition-all ${drawTool.startsWith('path') && drawTool !== 'path-select' ? 'bg-fuchsia-600 text-white shadow-lg' : 'text-txt-secondary hover:text-white'}`} title="Path Tool (P)"><PenTool size={18} /></button>
                     <button data-testid="draw-tool-select" onClick={() => setLocalDrawTool('select')} className={`p-2 rounded-lg transition-all ${drawTool === 'select' ? 'bg-indigo-600 text-white shadow-lg' : 'text-txt-secondary hover:text-white'}`} title="Selection Tool (S)"><BoxSelect size={18} /></button>
                 </div>
                 
-                {drawTool !== 'select' && (
+                {drawTool.startsWith('path') && (
+                    <>
+                        <div className="w-px h-6 bg-white/10 mx-2" />
+                        <div className="flex items-center gap-1">
+                            <button data-testid="path-tool-draw" onClick={() => setLocalDrawTool('path')} className={`p-2 rounded-lg transition-all ${drawTool === 'path' ? 'bg-fuchsia-800 text-white shadow-lg' : 'text-txt-secondary hover:text-white'}`} title="Pen Tool"><PenTool size={14} /></button>
+                            <button data-testid="path-tool-add" onClick={() => setLocalDrawTool('path-add')} className={`p-2 rounded-lg transition-all ${drawTool === 'path-add' ? 'bg-fuchsia-800 text-white shadow-lg' : 'text-txt-secondary hover:text-white'}`} title="Add Anchor Point"><Plus size={14} /></button>
+                            <button data-testid="path-tool-delete" onClick={() => setLocalDrawTool('path-delete')} className={`p-2 rounded-lg transition-all ${drawTool === 'path-delete' ? 'bg-fuchsia-800 text-white shadow-lg' : 'text-txt-secondary hover:text-white'}`} title="Delete Anchor Point"><Minus size={14} /></button>
+                            <button data-testid="path-tool-convert" onClick={() => setLocalDrawTool('path-convert')} className={`p-2 rounded-lg transition-all ${drawTool === 'path-convert' ? 'bg-fuchsia-800 text-white shadow-lg' : 'text-txt-secondary hover:text-white'}`} title="Convert Point"><CornerUpRight size={14} /></button>
+                            <button data-testid="path-tool-select" onClick={() => setLocalDrawTool('path-select')} className={`p-2 rounded-lg transition-all ${drawTool === 'path-select' ? 'bg-indigo-700 text-white shadow-lg' : 'text-txt-secondary hover:text-white'}`} title="Direct Selection Tool (A)"><MousePointer2 size={14} /></button>
+                        </div>
+                    </>
+                )}
+                
+                {drawTool !== 'select' && !drawTool.startsWith('path-') && drawTool !== 'path' && (
                     <>
                         <div className="w-px h-8 bg-white/5 mx-2" />
                         <div className="w-32 px-2">
-                             <Slider min={1} max={100} value={brushSettings.brushSize} onChange={(v) => updatePaintNode({brushSize: v})} accent={drawTool === 'eraser' ? "red" as any : "pink"} />
+                             <Slider min={1} max={100} value={brushSettings.brushSize} onChange={(v) => updatePaintNode({brushSize: v})} accent={drawTool === 'eraser' ? "red" : "pink" as any} disabled={drawTool === 'bucket'} />
                         </div>
-                        {drawTool === 'brush' && (
+                        {drawTool !== 'eraser' && (
                             <ColorPicker value={brushSettings.brushColor} onChange={(v) => updatePaintNode({brushColor: v})} accent="pink" className="bg-transparent border-none p-0 w-24" />
                         )}
                     </>

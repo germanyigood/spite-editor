@@ -1,6 +1,115 @@
 
 import { SpriteConfig, Frame } from "../types";
 
+export function floodFill(ctx: CanvasRenderingContext2D, x: number, y: number, fillColorStr: string, tolerance: number = 0) {
+    const canvas = ctx.canvas;
+    const w = canvas.width;
+    const h = canvas.height;
+    if (x < 0 || x >= w || y < 0 || y >= h) return;
+    
+    // Parse fillColorStr (e.g. #ff0000)
+    let fillR = 0, fillG = 0, fillB = 0, fillA = 255;
+    if (fillColorStr.startsWith('#')) {
+        const hex = fillColorStr.substring(1);
+        if (hex.length === 6) {
+            fillR = parseInt(hex.substring(0, 2), 16);
+            fillG = parseInt(hex.substring(2, 4), 16);
+            fillB = parseInt(hex.substring(4, 6), 16);
+        }
+    }
+
+    const imgData = ctx.getImageData(0, 0, w, h);
+    const data = imgData.data;
+
+    const startPos = (Math.floor(y) * w + Math.floor(x)) * 4;
+    const startR = data[startPos];
+    const startG = data[startPos + 1];
+    const startB = data[startPos + 2];
+    const startA = data[startPos + 3];
+
+    if (startR === fillR && startG === fillG && startB === fillB && startA === fillA) return;
+
+    if (tolerance > 0) {
+        const diffR = Math.abs(fillR - startR);
+        const diffG = Math.abs(fillG - startG);
+        const diffB = Math.abs(fillB - startB);
+        const diffA = Math.abs(fillA - startA);
+        if ((diffR + diffG + diffB + diffA) <= tolerance) return;
+    }
+
+    const matchColor = (pos: number) => {
+        const r = data[pos];
+        const g = data[pos + 1];
+        const b = data[pos + 2];
+        const a = data[pos + 3];
+        if (tolerance === 0) {
+            return r === startR && g === startG && b === startB && a === startA;
+        }
+        const diffR = Math.abs(r - startR);
+        const diffG = Math.abs(g - startG);
+        const diffB = Math.abs(b - startB);
+        const diffA = Math.abs(a - startA);
+        return (diffR + diffG + diffB + diffA) <= tolerance;
+    };
+
+    const setPixel = (pos: number) => {
+        data[pos] = fillR;
+        data[pos + 1] = fillG;
+        data[pos + 2] = fillB;
+        data[pos + 3] = fillA;
+    };
+
+    const stack: number[] = [Math.floor(x), Math.floor(y)];
+    
+    while (stack.length > 0) {
+        const currY = stack.pop()!;
+        const currX = stack.pop()!;
+
+        let currentPos = (currY * w + currX) * 4;
+        
+        // Find left boundary
+        let minX = currX;
+        while (minX >= 0 && matchColor(currentPos)) {
+            minX--;
+            currentPos -= 4;
+        }
+        minX++;
+        currentPos += 4;
+
+        let spanAbove = false;
+        let spanBelow = false;
+
+        while (minX < w && matchColor(currentPos)) {
+            setPixel(currentPos);
+            
+            if (currY > 0) {
+                const posAbove = currentPos - w * 4;
+                if (!spanAbove && matchColor(posAbove)) {
+                    stack.push(minX, currY - 1);
+                    spanAbove = true;
+                } else if (spanAbove && !matchColor(posAbove)) {
+                    spanAbove = false;
+                }
+            }
+
+            if (currY < h - 1) {
+                const posBelow = currentPos + w * 4;
+                if (!spanBelow && matchColor(posBelow)) {
+                    stack.push(minX, currY + 1);
+                    spanBelow = true;
+                } else if (spanBelow && !matchColor(posBelow)) {
+                    spanBelow = false;
+                }
+            }
+
+            minX++;
+            currentPos += 4;
+        }
+    }
+    
+    ctx.putImageData(imgData, 0, 0);
+}
+
 export const DEFAULT_SPRITE_CONFIG: SpriteConfig = {
   rows: 1, cols: 1, width: 0, height: 0,
   offsetX: 0, offsetY: 0, margin: 0,

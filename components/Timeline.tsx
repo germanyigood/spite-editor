@@ -1,8 +1,7 @@
-
 import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
-import { Trash2, Copy, Play, Pause, ZoomIn, Search, GripHorizontal, ChevronDown, Film } from 'lucide-react';
+import { Trash2, Copy, Play, Pause, ZoomIn, Search, GripHorizontal, ChevronDown, Film, EyeOff, RotateCcw } from 'lucide-react';
 import { useProject } from '../context/ProjectContext';
-import { TimelineNode, Frame, ImageSource, NodePayload } from '../types';
+import { TimelineNode, ImageSource, NodePayload } from '../types';
 import { BitmapView } from './common/BitmapView';
 import { ContextMenu, ContextMenuConfig } from './common/design-system/ContextMenu';
 
@@ -11,51 +10,58 @@ interface TimelineProps {
   nodeOutputs: Record<string, NodePayload | null>;
 }
 
-// Optimized Frame Component
+// Optimized Frame Component with visual selection, pointer behaviors, and muted badge
 const TimelineFrameItem = React.memo(({ 
-    imgSrc, index, width, height, isActive, isDragging, isDropTarget, isDragSource, 
-    onDragStart, onDragOver, onDrop, onMouseDown, onContextMenu 
+    imgSrc, index, width, height, isActive, isSelected, isMuted, isDragging,
+    onPointerDown, onContextMenu 
 }: any) => {
     return (
         <div
             data-testid={`timeline-frame-item-${index}`}
-            draggable
-            onDragStart={(e) => onDragStart(e, index)}
-            onDragOver={(e) => onDragOver(e, index)}
-            onDragEnd={onDrop}
-            onMouseDown={(e) => onMouseDown(index)}
+            onPointerDown={(e) => onPointerDown(e, index)}
             onContextMenu={(e) => onContextMenu(e, index)}
             className={`
-                flex-shrink-0 relative rounded-md border overflow-hidden group cursor-pointer transition-all duration-75 select-none
-                ${isActive 
-                    ? 'ring-2 ring-indigo-500 z-10 border-indigo-500/50' 
-                    : 'border-border-base/10 hover:bg-surface-hover/5 hover:border-border-base/30'
+                flex-shrink-0 relative rounded-xl border overflow-hidden group cursor-pointer transition-all duration-100 select-none
+                ${isSelected 
+                    ? 'ring-2 ring-blue-500 z-10 border-blue-400 bg-blue-500/10 shadow-[0_0_12px_rgba(59,130,246,0.3)]' 
+                    : isActive 
+                        ? 'ring-2 ring-indigo-500 z-10 border-indigo-500 bg-indigo-500/10' 
+                        : 'border-white/10 hover:bg-white/[0.03] hover:border-white/20'
                 }
-                ${isDragging ? 'opacity-20' : 'opacity-100'}
+                ${isDragging ? 'opacity-20 scale-95 border-dashed border-white/20 blur-[1px]' : 'opacity-100 scale-100'}
             `}
             style={{ 
                 width: width - 2, 
                 height: height,
                 marginRight: 2,
-                transform: isDropTarget ? (isDragSource < index ? 'translateX(-10px)' : 'translateX(10px)') : 'none'
+                touchAction: 'none', // Prevents default touch gestures while dragging on mobile
             }}
         >
-            {/* Drop Indicator */}
-            {isDropTarget && (
-                <div className={`absolute top-0 bottom-0 w-0.5 bg-indigo-500 z-50 ${isDragSource < index ? '-right-1.5' : '-left-1.5'}`} />
+            {/* Selection Checkmark Dot Indicator */}
+            {isSelected && (
+                <div className="absolute top-1.5 right-1.5 z-20 w-3.5 h-3.5 rounded-full bg-blue-500 border border-blue-200/50 flex items-center justify-center shadow-lg animate-in zoom-in-50 duration-150">
+                    <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                </div>
             )}
 
-            <div className="w-full h-full flex items-center justify-center pointer-events-none bg-black/5 dark:bg-black/20">
+            {/* Muted Indicator overlay */}
+            {isMuted && (
+                <div className="absolute top-1 right-1 z-20 text-red-500 bg-panel/85 p-0.5 rounded border border-border-base/15">
+                    <EyeOff size={10} />
+                </div>
+            )}
+
+            <div className="w-full h-full flex items-center justify-center pointer-events-none bg-black/10 dark:bg-black/30">
                 {imgSrc ? (
-                    <BitmapView image={imgSrc} mode="contain" className="w-full h-full p-1 opacity-80 group-hover:opacity-100 transition-opacity" />
+                    <BitmapView image={imgSrc} mode="contain" className={`w-full h-full p-1 transition-opacity ${isMuted ? 'opacity-30' : 'opacity-85 group-hover:opacity-100'}`} />
                 ) : (
-                    <span className="text-[8px] text-red-500 font-bold">ERR</span>
+                    <span className="text-[10px] text-red-500 font-bold font-mono">ERR</span>
                 )}
             </div>
             
-            {/* Index Label (Hide if too small) */}
+            {/* Index Label */}
             {width > 24 && (
-                <div className="absolute top-0 left-0 bg-panel/80 text-[9px] text-txt-secondary px-1.5 backdrop-blur-sm rounded-br border-r border-b border-border-base/10 font-mono">
+                <div className="absolute bottom-0 left-0 bg-panel/85 text-[9px] text-txt-secondary px-1.5 py-0.5 backdrop-blur-sm rounded-tr border-r border-t border-border-base/15 font-mono">
                     {index}
                 </div>
             )}
@@ -68,9 +74,9 @@ const TimelineFrameItem = React.memo(({
         prev.width === next.width &&
         prev.height === next.height && 
         prev.isActive === next.isActive &&
-        prev.isDragging === next.isDragging &&
-        prev.isDropTarget === next.isDropTarget &&
-        prev.isDragSource === next.isDragSource
+        prev.isSelected === next.isSelected &&
+        prev.isMuted === next.isMuted &&
+        prev.isDragging === next.isDragging
     );
 });
 
@@ -80,62 +86,93 @@ const Timeline: React.FC<TimelineProps> = ({ generatedFrames, nodeOutputs }) => 
   const currentAnim = animations.find(a => a.id === activeAnimationId);
   
   // --- NODE SELECTION LOGIC ---
-  // Find all timeline nodes
   const allTimelineNodes = useMemo(() => {
-      return (currentAnim?.nodeGraph.nodes.filter(n => n.type === 'timeline') as TimelineNode[]) || [];
-  }, [currentAnim?.nodeGraph.nodes]);
+      return (currentAnim?.nodeGraph?.nodes?.filter(n => n.type === 'timeline') as TimelineNode[]) || [];
+  }, [currentAnim?.nodeGraph?.nodes]);
 
-  // Determine active timeline node:
-  // 1. If user selected a timeline node in graph, use that.
-  // 2. Else use local state selection.
-  // 3. Else default to first available.
   const [localActiveId, setLocalActiveId] = useState<string | null>(null);
 
   const activeTimelineNode = useMemo(() => {
-      // Priority 1: Global Graph Selection
       const globalSelection = allTimelineNodes.find(n => n.id === selectedNodeId);
       if (globalSelection) return globalSelection;
 
-      // Priority 2: Local Selection (if valid)
       const localSelection = allTimelineNodes.find(n => n.id === localActiveId);
       if (localSelection) return localSelection;
 
-      // Priority 3: First available
       return allTimelineNodes[0];
   }, [allTimelineNodes, selectedNodeId, localActiveId]);
 
-  // Sync local state when active changes to keep UI consistent
   useEffect(() => {
       if (activeTimelineNode && activeTimelineNode.id !== localActiveId) {
           setLocalActiveId(activeTimelineNode.id);
       }
-  }, [activeTimelineNode?.id]);
+  }, [activeTimelineNode?.id, localActiveId]);
 
   const frames = activeTimelineNode?.data.frames || [];
+  const mutedIndices = activeTimelineNode?.data.mutedIndices || [];
+  const currentFrameIndex = activeTimelineNode?.data.currentFrame ?? 0;
+
+  // Refs for stale value prevention in window event listeners
+  const framesRef = useRef<number[]>(frames);
+  const mutedIndicesRef = useRef<number[]>(mutedIndices);
+  const selectedIndicesRef = useRef<Set<number>>(new Set());
+  const activeTimelineNodeRef = useRef(activeTimelineNode);
   
-  // State
+  useEffect(() => { framesRef.current = frames; }, [frames]);
+  useEffect(() => { mutedIndicesRef.current = mutedIndices; }, [mutedIndices]);
+  useEffect(() => { activeTimelineNodeRef.current = activeTimelineNode; }, [activeTimelineNode]);
+
+  // Scrolling, Context Menu, Controls Coordinates
   const containerRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const rafRef = useRef<number | null>(null);
-
   const [contextMenuConfig, setContextMenuConfig] = useState<ContextMenuConfig | null>(null);
   const [isScrubbing, setIsScrubbing] = useState(false);
+  const rafRef = useRef<number | null>(null);
   
-  // Visual Config
-  const [frameWidth, setFrameWidth] = useState(48);
-  const [trackHeight, setTrackHeight] = useState(64);
+  const [frameWidth, setFrameWidth] = useState(64);
+  const [trackHeight, setTrackHeight] = useState(80);
   
-  const MIN_ZOOM = 16;
+  const MIN_ZOOM = 24;
   const MAX_ZOOM = 300;
-  const MIN_HEIGHT = 32;
+  const MIN_HEIGHT = 48;
   const MAX_HEIGHT = 160;
 
-  // Drag State
-  const [dragSourceIndex, setDragSourceIndex] = useState<number | null>(null);
-  const [dropTargetIndex, setDropTargetIndex] = useState<number | null>(null);
+  // Selection state
+  const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
+  useEffect(() => { selectedIndicesRef.current = selectedIndices; }, [selectedIndices]);
 
-  // Current Logic Frame
-  const currentFrameIndex = activeTimelineNode?.data.currentFrame ?? 0;
+  // --- Visual Pointer Scrolling, Drag and Drop, Marquee States ---
+  const [isCustomDragging, setIsCustomDragging] = useState(false);
+  const [customDragIndex, setCustomDragIndex] = useState<number | null>(null);
+  const [customDragCoords, setCustomDragCoords] = useState<{ x: number, y: number, offsetX: number, offsetY: number }>({ x: 0, y: 0, offsetX: 0, offsetY: 0 });
+  
+  const [customDropInsertIndex, _setCustomDropInsertIndex] = useState<number | null>(null);
+  const customDropInsertIndexRef = useRef<number | null>(null);
+  const setCustomDropInsertIndex = (index: number | null) => {
+      customDropInsertIndexRef.current = index;
+      _setCustomDropInsertIndex(index);
+  };
+
+  const [selectionMarquee, setSelectionMarquee] = useState<{
+      startX: number;
+      startY: number;
+      currentX: number;
+      currentY: number;
+      isActive: boolean;
+  } | null>(null);
+
+  const pointerDragRef = useRef<{
+      index: number;
+      startX: number;
+      startY: number;
+      offsetX: number;
+      offsetY: number;
+      isDragging: boolean;
+      lastX: number;
+      lastY: number;
+  } | null>(null);
+  
+  const activeDragSelectionRef = useRef<Set<number>>(new Set());
 
   // --- Core Update Logic ---
   const updateTimeline = useCallback((updates: Partial<TimelineNode['data']>) => {
@@ -149,23 +186,38 @@ const Timeline: React.FC<TimelineProps> = ({ generatedFrames, nodeOutputs }) => 
 
   const handleSeek = useCallback((frameIndex: number) => {
       const idx = Math.max(0, Math.min(frameIndex, frames.length - 1));
-      
-      // Update Global Selection (UI Highlight)
       if (idx !== selectedTimelineIndex) {
           dispatch({ type: 'SELECT_TIMELINE_FRAME', payload: idx });
       }
-
-      // Live Update: Only dispatch if frame index CHANGED
       if (idx !== activeTimelineNode?.data.currentFrame) {
           updateTimeline({ currentFrame: idx });
       }
   }, [frames.length, activeTimelineNode?.data.currentFrame, selectedTimelineIndex, dispatch, updateTimeline]);
 
-  // --- Ruler / Scrubber Logic ---
+  const handleFrameClick = useCallback((e: MouseEvent | PointerEvent, index: number) => {
+      setSelectedIndices(prev => {
+          const newSelection = new Set(prev);
+          if (e.shiftKey && newSelection.size > 0) {
+              const lastSelected = Array.from(newSelection).pop() ?? index;
+              const start = Math.min(index, lastSelected);
+              const end = Math.max(index, lastSelected);
+              for (let i = start; i <= end; i++) newSelection.add(i);
+          } else if (e.ctrlKey || e.metaKey) {
+              if (newSelection.has(index)) newSelection.delete(index);
+              else newSelection.add(index);
+          } else {
+              newSelection.clear();
+              newSelection.add(index);
+          }
+          return newSelection;
+      });
+      handleSeek(index);
+  }, [handleSeek]);
 
+  // --- Ruler / Playhead Scrubbing ---
   const handleRulerMouseDown = (e: React.MouseEvent) => {
       setIsScrubbing(true);
-      handleScrub(e); // Instant seek on click
+      handleScrub(e);
   };
 
   const handleScrub = useCallback((e: React.MouseEvent | MouseEvent) => {
@@ -173,7 +225,6 @@ const Timeline: React.FC<TimelineProps> = ({ generatedFrames, nodeOutputs }) => 
       const rect = scrollRef.current.getBoundingClientRect();
       const relativeX = e.clientX - rect.left + scrollRef.current.scrollLeft;
       const frameIndex = Math.floor(relativeX / frameWidth);
-      
       handleSeek(frameIndex); 
   }, [frameWidth, handleSeek]);
 
@@ -181,7 +232,6 @@ const Timeline: React.FC<TimelineProps> = ({ generatedFrames, nodeOutputs }) => 
       const onMove = (e: MouseEvent) => { 
           if (isScrubbing) {
               if (rafRef.current) cancelAnimationFrame(rafRef.current);
-              // Throttle to RAF, but update is live
               rafRef.current = requestAnimationFrame(() => handleScrub(e));
           }
       };
@@ -203,31 +253,27 @@ const Timeline: React.FC<TimelineProps> = ({ generatedFrames, nodeOutputs }) => 
       };
   }, [isScrubbing, handleScrub]);
 
-  // --- Zoom Logic (Native Event to block Browser Zoom) ---
-
+  // --- Native Wheels Events for Zoom Protection ---
   useEffect(() => {
       const el = scrollRef.current;
       if (!el) return;
 
       const onWheel = (e: WheelEvent) => {
           if (e.ctrlKey || e.metaKey) {
-              e.preventDefault(); // CRITICAL: Stop browser zoom
+              e.preventDefault();
               e.stopPropagation();
-
-              const delta = -Math.sign(e.deltaY) * 4;
+              const delta = -Math.sign(e.deltaY) * 6;
               setFrameWidth(prev => Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, prev + delta)));
           }
       };
 
-      // Passive: false is required to use preventDefault
       el.addEventListener('wheel', onWheel, { passive: false });
-      
       return () => {
           el.removeEventListener('wheel', onWheel);
       };
   }, []);
 
-  // Scroll Playhead into view
+  // Sync scroll positioning to keep selected frame in bounds
   useEffect(() => {
       if (activeTimelineNode?.data.isPlaying && scrollRef.current) {
           const currentLeft = currentFrameIndex * frameWidth;
@@ -242,24 +288,62 @@ const Timeline: React.FC<TimelineProps> = ({ generatedFrames, nodeOutputs }) => 
       }
   }, [currentFrameIndex, activeTimelineNode?.data.isPlaying, frameWidth]);
 
+  // --- Context Menu and Selection Multi-Actions ---
+  const performAction = useCallback((action: 'duplicate' | 'delete' | 'mute', index: number) => {
+      const currentFrames = framesRef.current;
+      const currentMuted = mutedIndicesRef.current;
+      const currentSelection = selectedIndicesRef.current;
 
-  // --- Context Menu Actions ---
-
-  const performAction = useCallback((action: 'duplicate' | 'delete', index: number) => {
-      const newFrames = [...frames];
+      const newFrames = [...currentFrames];
+      const targets = currentSelection.has(index) ? Array.from(currentSelection).sort((a,b)=>a-b) : [index];
 
       if (action === 'delete') {
-          newFrames.splice(index, 1);
-          let newCursor = activeTimelineNode?.data.currentFrame || 0;
+          const remainingMuted = [];
+          for(let i=0; i<currentFrames.length; i++) {
+              if (!targets.includes(i) && currentMuted.includes(i)) {
+                  const shift = targets.filter(t => t < i).length;
+                  remainingMuted.push(i - shift);
+              }
+          }
+          for(let i=targets.length-1; i>=0; i--) {
+              newFrames.splice(targets[i], 1);
+          }
+          
+          let newCursor = currentFrameIndex;
           if (newCursor >= newFrames.length) newCursor = Math.max(0, newFrames.length - 1);
-          updateTimeline({ frames: newFrames, currentFrame: newCursor });
-          if (index === selectedTimelineIndex) dispatch({ type: 'SELECT_TIMELINE_FRAME', payload: null });
+          
+          setSelectedIndices(new Set());
+          updateTimeline({ frames: newFrames, currentFrame: newCursor, mutedIndices: remainingMuted });
       } else if (action === 'duplicate') {
-          newFrames.splice(index + 1, 0, frames[index]);
-          updateTimeline({ frames: newFrames });
+          const insertIndex = targets[targets.length - 1] + 1;
+          const framesToInsert = targets.map(t => currentFrames[t]);
+          const mutedToInsert = targets.map(t => currentMuted.includes(t));
+          
+          newFrames.splice(insertIndex, 0, ...framesToInsert);
+          
+          let newMutedArray = Array.from({length: currentFrames.length}, (_, i) => currentMuted.includes(i));
+          newMutedArray.splice(insertIndex, 0, ...mutedToInsert);
+          
+          const newSelection = new Set<number>();
+          for (let i = 0; i < targets.length; i++) {
+              newSelection.add(insertIndex + i);
+          }
+          
+          const nextMutedIndices = newMutedArray.map((m, i) => m ? i : -1).filter(i => i !== -1);
+          setSelectedIndices(newSelection);
+          updateTimeline({ frames: newFrames, mutedIndices: nextMutedIndices, currentFrame: insertIndex });
+      } else if (action === 'mute') {
+          let newlyMuted = [...currentMuted];
+          const allMuted = targets.every(t => newlyMuted.includes(t));
+          if (allMuted) {
+              newlyMuted = newlyMuted.filter(m => !targets.includes(m));
+          } else {
+              targets.forEach(t => { if(!newlyMuted.includes(t)) newlyMuted.push(t); });
+          }
+          updateTimeline({ mutedIndices: newlyMuted.sort((a,b)=>a-b) });
       }
       setContextMenuConfig(null);
-  }, [frames, activeTimelineNode?.data.currentFrame, selectedTimelineIndex, dispatch, updateTimeline]);
+  }, [currentFrameIndex, updateTimeline]);
 
   const handleContextMenu = useCallback((e: React.MouseEvent, index: number) => {
       e.preventDefault();
@@ -269,6 +353,13 @@ const Timeline: React.FC<TimelineProps> = ({ generatedFrames, nodeOutputs }) => 
           y: e.clientY,
           header: `Frame ${index}`,
           items: [
+              {
+                  id: 'mute',
+                  label: mutedIndices.includes(index) ? 'Unmute' : 'Mute',
+                  icon: EyeOff,
+                  colorClass: 'text-orange-400',
+                  onClick: () => performAction('mute', index)
+              },
               {
                   id: 'duplicate',
                   label: 'Duplicate',
@@ -285,58 +376,246 @@ const Timeline: React.FC<TimelineProps> = ({ generatedFrames, nodeOutputs }) => 
               }
           ]
       });
-  }, [performAction]);
+  }, [performAction, mutedIndices]);
 
-  // --- Drag & Drop ---
+  // --- Visual Drag & Drop Pointer Event Handlers ---
+  const handleFramePointerMove = useCallback((e: PointerEvent) => {
+      const dragInfo = pointerDragRef.current;
+      if (!dragInfo) return;
+      
+      const dx = e.clientX - dragInfo.startX;
+      const dy = e.clientY - dragInfo.startY;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      
+      if (!dragInfo.isDragging) {
+          if (distance > 5) {
+              dragInfo.isDragging = true;
+              
+              let dragSelection = new Set(activeDragSelectionRef.current);
+              if (!dragSelection.has(dragInfo.index)) {
+                  if (!e.ctrlKey && !e.metaKey && !e.shiftKey) {
+                      dragSelection = new Set([dragInfo.index]);
+                  } else {
+                      dragSelection.add(dragInfo.index);
+                  }
+                  setSelectedIndices(dragSelection);
+                  activeDragSelectionRef.current = dragSelection;
+              }
+              
+              setIsCustomDragging(true);
+              setCustomDragIndex(dragInfo.index);
+          }
+      }
+      
+      if (dragInfo.isDragging) {
+          setCustomDragCoords({ 
+              x: e.clientX, 
+              y: e.clientY,
+              offsetX: dragInfo.offsetX,
+              offsetY: dragInfo.offsetY
+          });
+          
+          const rect = scrollRef.current?.getBoundingClientRect();
+          if (rect) {
+              const xX = e.clientX - rect.left + scrollRef.current!.scrollLeft;
+              const fractionalIndex = xX / frameWidth;
+              const targetIndex = Math.floor(fractionalIndex);
+              const isAfter = (fractionalIndex - targetIndex) > 0.5;
+              const calculatedInsertIndex = Math.max(0, Math.min(framesRef.current.length, isAfter ? targetIndex + 1 : targetIndex));
+              setCustomDropInsertIndex(calculatedInsertIndex);
+              
+              // Handle scrolling if near scroll boundaries
+              const nearLeftThreshold = rect.left + 80;
+              const nearRightThreshold = rect.right - 80;
+              
+              if (e.clientX < nearLeftThreshold) {
+                  const scrollSpeed = Math.max(2, Math.min(20, (nearLeftThreshold - e.clientX) / 3));
+                  scrollRef.current!.scrollLeft -= scrollSpeed;
+              } else if (e.clientX > nearRightThreshold) {
+                  const scrollSpeed = Math.max(2, Math.min(20, (e.clientX - nearRightThreshold) / 3));
+                  scrollRef.current!.scrollLeft += scrollSpeed;
+              }
+          }
+      }
+  }, [frameWidth]);
 
-  const handleDragStart = useCallback((e: React.DragEvent, index: number) => {
-      setDragSourceIndex(index);
-      const ghost = document.createElement('div');
-      ghost.style.width = '1px'; ghost.style.height = '1px';
-      document.body.appendChild(ghost);
-      e.dataTransfer.setDragImage(ghost, 0, 0);
-      setTimeout(() => document.body.removeChild(ghost), 0);
+  const handleFramePointerUp = useCallback((e: PointerEvent) => {
+      const dragInfo = pointerDragRef.current;
+      
+      window.removeEventListener('pointermove', handleFramePointerMove);
+      window.removeEventListener('pointerup', handleFramePointerUp);
+      
+      if (!dragInfo) return;
+      pointerDragRef.current = null;
+      
+      if (dragInfo.isDragging) {
+          const insertAt = customDropInsertIndexRef.current;
+          const draggedIndices = Array.from(activeDragSelectionRef.current).sort((a, b) => a - b);
+          
+          if (draggedIndices.length > 0 && insertAt !== null && insertAt !== undefined) {
+              const currentFrames = framesRef.current;
+              const currentMuted = mutedIndicesRef.current;
+              
+              const newFrames = [];
+              const newMuted = [];
+              const movedFrames = [];
+              const movedMutedState = [];
+              
+              for (let i = 0; i < currentFrames.length; i++) {
+                  const isMuted = currentMuted.includes(i);
+                  if (draggedIndices.includes(i)) {
+                      movedFrames.push(currentFrames[i]);
+                      movedMutedState.push(isMuted);
+                  } else {
+                      newFrames.push(currentFrames[i]);
+                      newMuted.push(isMuted);
+                  }
+              }
+              
+              let adjustedInsertAt = insertAt;
+              const numRemovedBeforeDrop = draggedIndices.filter(i => i < insertAt).length;
+              adjustedInsertAt -= numRemovedBeforeDrop;
+              
+              newFrames.splice(adjustedInsertAt, 0, ...movedFrames);
+              newMuted.splice(adjustedInsertAt, 0, ...movedMutedState);
+              
+              const nextMutedIndices = newMuted.map((m, i) => m ? i : -1).filter(i => i !== -1);
+              const newSelections = new Set(movedFrames.map((_, i) => adjustedInsertAt + i));
+              
+              setSelectedIndices(newSelections);
+              
+              if (activeTimelineNodeRef.current) {
+                  dispatch({ 
+                      type: 'UPDATE_NODE_DATA', 
+                      payload: { 
+                          animId: activeAnimationId!, 
+                          nodeId: activeTimelineNodeRef.current.id, 
+                          data: {
+                              frames: newFrames, 
+                              mutedIndices: nextMutedIndices,
+                              currentFrame: adjustedInsertAt 
+                          } 
+                      } 
+                  });
+              }
+          }
+          
+          setIsCustomDragging(false);
+          setCustomDragIndex(null);
+          setCustomDropInsertIndex(null);
+      } else {
+          handleFrameClick(e, dragInfo.index);
+      }
+  }, [activeAnimationId, dispatch, handleFrameClick, handleFramePointerMove]);
+
+  const handleFramePointerDown = useCallback((e: React.PointerEvent, index: number) => {
+      if (e.button !== 0) return;
+      e.stopPropagation();
+      
+      const el = e.currentTarget as HTMLElement;
+      const rect = el.getBoundingClientRect();
+      
+      pointerDragRef.current = {
+          index,
+          startX: e.clientX,
+          startY: e.clientY,
+          offsetX: e.clientX - rect.left,
+          offsetY: e.clientY - rect.top,
+          isDragging: false,
+          lastX: e.clientX,
+          lastY: e.clientY,
+      };
+      
+      activeDragSelectionRef.current = new Set(selectedIndicesRef.current);
+      
+      window.addEventListener('pointermove', handleFramePointerMove);
+      window.addEventListener('pointerup', handleFramePointerUp);
+  }, [handleFramePointerMove, handleFramePointerUp]);
+
+  useEffect(() => {
+      return () => {
+          window.removeEventListener('pointermove', handleFramePointerMove);
+          window.removeEventListener('pointerup', handleFramePointerUp);
+      };
+  }, [handleFramePointerMove, handleFramePointerUp]);
+
+  // --- Marquee Select Background Empty Space dragging ---
+  const handleTrackAreaPointerDown = useCallback((e: React.PointerEvent) => {
+      if (e.button !== 0) return;
+      
+      const targetEl = e.target as HTMLElement;
+      if (targetEl.closest('[data-testid^="timeline-frame-item-"]') || targetEl.closest('.cursor-ew-resize') || targetEl.closest('button') || targetEl.closest('select')) {
+          return;
+      }
+      
+      const rect = scrollRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      
+      const startX = e.clientX - rect.left + scrollRef.current!.scrollLeft;
+      const startY = e.clientY - rect.top + scrollRef.current!.scrollTop;
+      
+      setSelectionMarquee({
+          startX,
+          startY,
+          currentX: startX,
+          currentY: startY,
+          isActive: true,
+      });
+      
+      scrollRef.current?.setPointerCapture(e.pointerId);
   }, []);
 
-  const handleDragOver = useCallback((e: React.DragEvent, index: number) => {
-      e.preventDefault();
-      if (dragSourceIndex === null || dragSourceIndex === index) return;
-      setDropTargetIndex(index);
-  }, [dragSourceIndex]);
-
-  const handleDrop = () => {
-      if (dragSourceIndex !== null && dropTargetIndex !== null && dragSourceIndex !== dropTargetIndex) {
-          const newFrames = [...frames];
-          const [moved] = newFrames.splice(dragSourceIndex, 1);
-          newFrames.splice(dropTargetIndex, 0, moved);
+  const handleTrackAreaPointerMove = useCallback((e: React.PointerEvent) => {
+      if (selectionMarquee?.isActive) {
+          const rect = scrollRef.current?.getBoundingClientRect();
+          if (!rect) return;
           
-          // Re-calculate cursor position if we moved the selected frame
-          let newCursor = currentFrameIndex;
-          if (currentFrameIndex === dragSourceIndex) {
-              newCursor = dropTargetIndex;
-          } else if (
-              dragSourceIndex < currentFrameIndex && 
-              dropTargetIndex >= currentFrameIndex
-          ) {
-              newCursor--;
-          } else if (
-              dragSourceIndex > currentFrameIndex &&
-              dropTargetIndex <= currentFrameIndex
-          ) {
-              newCursor++;
+          const currentX = e.clientX - rect.left + scrollRef.current!.scrollLeft;
+          const currentY = e.clientY - rect.top + scrollRef.current!.scrollTop;
+          
+          setSelectionMarquee(prev => prev ? { ...prev, currentX, currentY } : null);
+          
+          const minX = Math.min(selectionMarquee.startX, currentX);
+          const maxX = Math.max(selectionMarquee.startX, currentX);
+          const minY = Math.min(selectionMarquee.startY, currentY);
+          const maxY = Math.max(selectionMarquee.startY, currentY);
+          
+          const trackTop = 32; // 24px ruler + 8px py-2 padding
+          const trackBottom = trackTop + trackHeight;
+          
+          const newSelected = new Set<number>();
+          
+          if (minY < trackBottom && maxY > trackTop) {
+              framesRef.current.forEach((_, i) => {
+                  const frameLeft = i * frameWidth;
+                  const frameRight = (i + 1) * frameWidth;
+                  if (frameLeft < maxX && frameRight > minX) {
+                      newSelected.add(i);
+                  }
+              });
           }
-
-          updateTimeline({ frames: newFrames, currentFrame: newCursor });
+          
+          if (e.ctrlKey || e.metaKey || e.shiftKey) {
+              setSelectedIndices(prev => {
+                  const combined = new Set(prev);
+                  newSelected.forEach(idx => combined.add(idx));
+                  return combined;
+              });
+          } else {
+              setSelectedIndices(newSelected);
+          }
       }
-      setDragSourceIndex(null);
-      setDropTargetIndex(null);
-  };
+  }, [selectionMarquee, frameWidth]);
 
-  // --- Rendering ---
+  const handleTrackAreaPointerUp = useCallback((e: React.PointerEvent) => {
+      if (selectionMarquee?.isActive) {
+          scrollRef.current?.releasePointerCapture(e.pointerId);
+          setSelectionMarquee(null);
+      }
+  }, [selectionMarquee]);
 
-  // Resolving Images: Use the Node Processor Output (Source of Truth) if available
+  // Resolving Images
   const activePayload = activeTimelineNode ? nodeOutputs[activeTimelineNode.id] : null;
-  const processedFrames = (activePayload?.type === 'TIMELINE') ? activePayload.frames : null;
 
   return (
     <div 
@@ -357,7 +636,6 @@ const Timeline: React.FC<TimelineProps> = ({ generatedFrames, nodeOutputs }) => 
                         value={activeTimelineNode?.id || ''}
                         onChange={(e) => {
                             setLocalActiveId(e.target.value);
-                            // Also select the node in the graph for UX clarity
                             dispatch({ type: 'SELECT_NODE', payload: e.target.value });
                         }}
                         className="bg-transparent border-none outline-none text-[10px] font-bold uppercase text-txt-primary w-full appearance-none cursor-pointer absolute inset-0 pl-8 opacity-0"
@@ -390,6 +668,35 @@ const Timeline: React.FC<TimelineProps> = ({ generatedFrames, nodeOutputs }) => 
             <div className="text-[10px] text-txt-muted font-mono bg-surface/50 px-2 py-0.5 rounded border border-border-base/5">
                 <span data-testid="timeline-playhead-index" className="text-txt-primary">{currentFrameIndex + 1}</span> <span className="opacity-50">/ {frames.length}</span>
             </div>
+            {selectedIndices.size > 0 && (
+                <>
+                <div className="h-4 w-px bg-border-base/10" />
+                <div className="flex items-center gap-1 bg-surface/50 rounded-lg border border-border-base/10 p-1">
+                    <button title="Duplicate Selected" onClick={() => performAction('duplicate', Array.from(selectedIndices)[0])} className="p-1.5 hover:bg-surface rounded text-txt-muted hover:text-blue-400"><Copy size={12} /></button>
+                    <button title="Mute/Unmute Selected" onClick={() => performAction('mute', Array.from(selectedIndices)[0])} className="p-1.5 hover:bg-surface rounded text-txt-muted hover:text-orange-400"><EyeOff size={12} /></button>
+                    <button title="Reverse Selected" onClick={() => {
+                        if (selectedIndices.size < 2) return;
+                        const targets = Array.from(selectedIndices).sort((a,b)=>a-b);
+                        const newFrames = [...frames];
+                        let newMutedArray = Array.from({length: frames.length}, (_, i) => mutedIndices.includes(i));
+                        
+                        const extractedFrames = targets.map(t => newFrames[t]).reverse();
+                        const extractedMuted = targets.map(t => newMutedArray[t]).reverse();
+                        
+                        targets.forEach((globalIndex, n) => {
+                            newFrames[globalIndex] = extractedFrames[n];
+                            newMutedArray[globalIndex] = extractedMuted[n];
+                        });
+                        const nextMutedIndices = newMutedArray.map((m, i) => m ? i : -1).filter(i => i !== -1);
+                        updateTimeline({ frames: newFrames, mutedIndices: nextMutedIndices });
+                    }} className="p-1.5 hover:bg-surface rounded text-txt-muted hover:text-indigo-400"><RotateCcw size={12} /></button>
+                    <button title="Delete Selected" onClick={() => performAction('delete', Array.from(selectedIndices)[0])} className="p-1.5 hover:bg-surface rounded text-txt-muted hover:text-red-400"><Trash2 size={12} /></button>
+                </div>
+                <div className="text-[10px] text-txt-muted">
+                    {selectedIndices.size} selected
+                </div>
+                </>
+            )}
         </div>
 
         <div className="flex items-center gap-4">
@@ -427,6 +734,9 @@ const Timeline: React.FC<TimelineProps> = ({ generatedFrames, nodeOutputs }) => 
           <div 
             ref={scrollRef}
             className="flex-1 overflow-x-auto overflow-y-hidden relative custom-scrollbar"
+            onPointerDown={handleTrackAreaPointerDown}
+            onPointerMove={handleTrackAreaPointerMove}
+            onPointerUp={handleTrackAreaPointerUp}
           >
               {/* Ruler */}
               <div 
@@ -435,7 +745,7 @@ const Timeline: React.FC<TimelineProps> = ({ generatedFrames, nodeOutputs }) => 
               >
                   {frames.map((_, i) => (
                       <div key={i} className="flex-shrink-0 relative group" style={{ width: frameWidth }}>
-                          <div className="absolute bottom-0 left-0 w-px h-2 bg-txt-muted/20 group-hover:h-3 transition-all" />
+                          <div className="absolute bottom-0 left-0 w-px h-2 bg-white/20 group-hover:h-3 transition-all" />
                           <span className="absolute bottom-2 left-1 text-[8px] text-txt-muted font-mono group-hover:text-txt-primary truncate w-full pointer-events-none">
                               {i % 5 === 0 || frameWidth > 40 ? i : ''}
                           </span>
@@ -448,20 +758,45 @@ const Timeline: React.FC<TimelineProps> = ({ generatedFrames, nodeOutputs }) => 
               {/* Tracks Container */}
               <div className="relative py-2">
                   
+                  {/* Drag-to-select range box display */}
+                  {selectionMarquee && selectionMarquee.isActive && (
+                      <div 
+                          className="absolute bg-blue-500/10 border border-blue-400 rounded pointer-events-none z-50 shadow-[0_0_8px_rgba(59,130,246,0.15)] content-visibility-auto"
+                          style={{
+                              left: Math.min(selectionMarquee.startX, selectionMarquee.currentX),
+                              top: Math.min(selectionMarquee.startY, selectionMarquee.currentY),
+                              width: Math.abs(selectionMarquee.currentX - selectionMarquee.startX),
+                              height: Math.abs(selectionMarquee.currentY - selectionMarquee.startY),
+                          }}
+                      />
+                  )}
+
+                  {/* Vertical Neon Drop Position Indicator Line */}
+                  {isCustomDragging && customDropInsertIndex !== null && (
+                      <div 
+                          className="absolute bottom-0 w-1 bg-blue-400 z-50 pointer-events-none"
+                          style={{
+                              top: 0,
+                              left: customDropInsertIndex * frameWidth,
+                              height: trackHeight + 16,
+                              boxShadow: '0 0 12px 2px rgba(96,165,250,0.8), 0 0 4px 1px rgba(96,165,250,0.6)',
+                              transform: 'translateX(-2px)'
+                          }}
+                      />
+                  )}
+
                   {/* Track 1: Main Frames */}
                   <div className="flex relative px-0.5 transition-[height] duration-200" style={{ height: trackHeight, minWidth: frames.length * frameWidth + 200 }}>
                       {frames.length === 0 && (
-                          <div className="absolute left-4 top-2 text-xs text-txt-muted italic">Timeline Empty. Connect a Grid Node or add frames.</div>
+                          <div className="absolute left-4 top-2 text-xs text-white/50 italic font-medium">Timeline Empty. Connect a Grid Node or add frames.</div>
                       )}
 
                       {frames.map((sourceFrameIdx, index) => {
-                          // Crucially: map using the active timeline's frames array
-                          // Use Processed Frame (Source of Truth) if available, else fallback to Global ID
-                          const imgSrc = processedFrames ? processedFrames[index] : generatedFrames[sourceFrameIdx];
+                          const imgSrc = generatedFrames[sourceFrameIdx];
                           
                           const isActive = index === currentFrameIndex;
-                          const isDragging = dragSourceIndex === index;
-                          const isDropTarget = dropTargetIndex === index;
+                          const isFrameSelected = selectedIndices.has(index);
+                          const isFrameDragging = isCustomDragging && selectedIndices.has(index);
 
                           return (
                               <TimelineFrameItem
@@ -471,13 +806,10 @@ const Timeline: React.FC<TimelineProps> = ({ generatedFrames, nodeOutputs }) => 
                                   width={frameWidth}
                                   height={trackHeight}
                                   isActive={isActive}
-                                  isDragging={isDragging}
-                                  isDropTarget={isDropTarget}
-                                  isDragSource={dragSourceIndex !== null ? dragSourceIndex : -1}
-                                  onDragStart={handleDragStart}
-                                  onDragOver={handleDragOver}
-                                  onDrop={handleDrop}
-                                  onMouseDown={() => handleSeek(index)} 
+                                  isSelected={isFrameSelected}
+                                  isMuted={mutedIndices.includes(index)}
+                                  isDragging={isFrameDragging}
+                                  onPointerDown={handleFramePointerDown} 
                                   onContextMenu={handleContextMenu}
                               />
                           );
@@ -497,6 +829,50 @@ const Timeline: React.FC<TimelineProps> = ({ generatedFrames, nodeOutputs }) => 
               </div>
           </div>
       </div>
+
+      {/* Floating Tactical Drag Ghost representation portal */}
+      {isCustomDragging && customDragIndex !== null && (
+          <div 
+              className="fixed z-[9999] pointer-events-none select-none drop-shadow-2xl transition-transform duration-100 ease-out"
+              style={{
+                  left: customDragCoords.x - customDragCoords.offsetX,
+                  top: customDragCoords.y - customDragCoords.offsetY,
+                  transform: 'scale(1.05)',
+                  transformOrigin: `${customDragCoords.offsetX}px ${customDragCoords.offsetY}px`,
+              }}
+          >
+              <div className="relative flex items-center justify-center rounded-xl bg-panel border-2 border-blue-500 shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden"
+                   style={{ width: frameWidth, height: trackHeight }}>
+                   
+                   {/* Background overlapping cards representation */}
+                   {selectedIndices.size > 1 && (
+                       <>
+                           <div className="absolute inset-0 bg-blue-500/10 border border-blue-400/30 rounded-xl -rotate-3 scale-95 opacity-50 translate-x-1.5 translate-y-1.5 pointer-events-none" />
+                       </>
+                   )}
+                   
+                   {/* Primary Thumbnail Preview */}
+                   <div className="w-full h-full relative rounded-lg overflow-hidden bg-black/40 flex items-center justify-center pointer-events-none">
+                       {generatedFrames[frames[customDragIndex]] ? (
+                           <BitmapView 
+                               image={generatedFrames[frames[customDragIndex]]} 
+                               mode="contain" 
+                               className="w-full h-full p-1 opacity-95 pointer-events-none" 
+                           />
+                       ) : (
+                           <span className="text-[10px] text-red-500 font-bold font-mono">ERR</span>
+                       )}
+                       
+                       {/* Count badge */}
+                       {selectedIndices.size > 1 && (
+                           <div className="absolute bottom-1 right-1 bg-blue-500 text-white font-mono font-bold text-[10px] px-2 py-0.5 rounded-full shadow-lg border border-blue-300">
+                               {selectedIndices.size}
+                           </div>
+                       )}
+                   </div>
+              </div>
+          </div>
+      )}
 
       <ContextMenu 
           config={contextMenuConfig} 

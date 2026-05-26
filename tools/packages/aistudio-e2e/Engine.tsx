@@ -80,9 +80,10 @@ export const E2EEngine = forwardRef<E2EEngineHandle, E2EEngineProps>(({ simSpeed
         const setupResults: E2EResult['setupResults'] = {};
         const stepResults: E2EResult['stepResults'] = {};
 
-        for (let i = 0; i < scenario.setup.length; i++) {
+        const setupSteps = scenario.setup || [];
+        for (let i = 0; i < setupSteps.length; i++) {
             if (isCancelledRef.current) break;
-            const step = scenario.setup[i];
+            const step = setupSteps[i];
             setCurrentStatusName(`[Setup] ${step.name}`);
             onStepUpdate(scenario.id, i, 'running', true);
             try {
@@ -102,9 +103,10 @@ export const E2EEngine = forwardRef<E2EEngineHandle, E2EEngineProps>(({ simSpeed
             await new Promise(r => setTimeout(r, 300));
         }
 
-        for (let i = 0; i < scenario.steps.length; i++) {
+        const testSteps = scenario.steps || [];
+        for (let i = 0; i < testSteps.length; i++) {
             if (isCancelledRef.current) break;
-            const step = scenario.steps[i];
+            const step = testSteps[i];
             setCurrentStatusName(`${scenario.name}: ${step.name}`);
             onStepUpdate(scenario.id, i, 'running', false);
             try {

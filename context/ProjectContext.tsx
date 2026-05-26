@@ -178,6 +178,7 @@ export const projectReducer = (state: ProjectState, action: Action): ProjectStat
       const ts = Date.now();
       const sourceId = `src_${ts}`;
       const paintId = `paint_${ts}`;
+      const vectorId = `vector_${ts}`;
       const chromaId = `chroma_${ts}`;
       const gridId = `grid_${ts}`;
       
@@ -214,16 +215,23 @@ export const projectReducer = (state: ProjectState, action: Action): ProjectStat
           pinnedAt: undefined
       };
 
+      const newVectorNode = {
+          id: vectorId, type: 'vector', isDefault: true,
+          x: 580, y: newSourceNode.y, width: 220, height: 280,
+          data: { paths: [] },
+          pinnedAt: undefined
+      };
+
       const newChromaNode: ChromaNode = {
           id: chromaId, type: 'chroma', isDefault: true,
-          x: 600, y: newSourceNode.y, width: 280, height: 420,
+          x: 830, y: newSourceNode.y, width: 280, height: 420,
           data: DEFAULT_KEYING_CONFIG,
           pinnedAt: Date.now() 
       };
 
       const newGridNode: GridNode = {
           id: gridId, type: 'grid', isDefault: true,
-          x: 930, y: newSourceNode.y, width: 240, height: 280,
+          x: 1140, y: newSourceNode.y, width: 240, height: 280,
           data: layer.spriteConfig,
           pinnedAt: Date.now() + 1 
       };
@@ -257,7 +265,8 @@ export const projectReducer = (state: ProjectState, action: Action): ProjectStat
       }
 
       newConns.push({ id: `c_${sourceId}_${paintId}`, source: sourceId, target: paintId });
-      newConns.push({ id: `c_${paintId}_${chromaId}`, source: paintId, target: chromaId });
+      newConns.push({ id: `c_${paintId}_${vectorId}`, source: paintId, target: vectorId });
+      newConns.push({ id: `c_${vectorId}_${chromaId}`, source: vectorId, target: chromaId });
       newConns.push({ id: `c_${chromaId}_${gridId}`, source: chromaId, target: gridId });
       newConns.push({ id: `c_${gridId}_${timelineNode.id}`, source: gridId, target: timelineNode.id });
 
@@ -270,7 +279,7 @@ export const projectReducer = (state: ProjectState, action: Action): ProjectStat
           newFrameIndices.push(totalExistingFrames + i);
       }
 
-      const updatedNodes = [...newNodes, newSourceNode, newPaintNode, newChromaNode, newGridNode].map(n => {
+      const updatedNodes = [...newNodes, newSourceNode, newPaintNode, newVectorNode, newChromaNode, newGridNode].map(n => {
           if (n.id === timelineNode.id && n.type === 'timeline') {
               return { ...n, data: { ...n.data, frames: [...n.data.frames, ...newFrameIndices] } };
           }

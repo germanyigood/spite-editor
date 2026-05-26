@@ -68,7 +68,7 @@ export const MainWorkspace: React.FC = () => {
 
     const { rightPanelWidth, timelineHeight, startResizeRight, startResizeTimeline } = usePanelResizer();
     const { handleExport } = useProjectExport();
-    const nodeOutputs = useNodeProcessing({ nodes: currentAnim?.nodeGraph.nodes || [], connections: currentAnim?.nodeGraph.connections || [] });
+    const nodeOutputs = useNodeProcessing({ nodes: currentAnim?.nodeGraph?.nodes || [], connections: currentAnim?.nodeGraph?.connections || [] });
     const { nodePreviewData, generatedFrames } = usePreviewState(currentAnim, nodeOutputs);
     const { handleFileLoad, handleVideoConfirm, errorMsg, setErrorMsg, pendingVideoFile, setPendingVideoFile } = useFileHandler({ currentAnim, layerCount, viewportRef });
 
@@ -156,10 +156,8 @@ export const MainWorkspace: React.FC = () => {
                     y = Math.floor((viewportRef.current.clientHeight - h) / 2);
                 }
 
-                setTimeout(() => {
-                    dispatch({ type: 'UPDATE_EDITOR_TRANSFORM', payload: { animId: currentAnim.id, transform: { x, y, scale: 1 } } });
-                    dispatch({ type: 'UPDATE_LAYOUT_CAMERA', payload: { animId: currentAnim.id, transform: { x, y, scale: 1 } } });
-                }, 50);
+                dispatch({ type: 'UPDATE_EDITOR_TRANSFORM', payload: { animId: currentAnim.id, transform: { x, y, scale: 1 } } });
+                dispatch({ type: 'UPDATE_LAYOUT_CAMERA', payload: { animId: currentAnim.id, transform: { x, y, scale: 1 } } });
             }
         };
         img.src = dataUrl;

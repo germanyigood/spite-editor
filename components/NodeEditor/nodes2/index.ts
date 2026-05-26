@@ -24,6 +24,7 @@ import { FillBundle } from './FillNode';
 import { PaintBundle } from './PaintNode';
 import { PixelizeBundle } from './PixelizeNode';
 import { FrameSkipBundle } from './FrameSkipNode';
+import { VectorBundle } from './VectorNode';
 
 // --- Type Definitions ---
 
@@ -64,6 +65,7 @@ export const NODE_REGISTRY: Record<string, NodeBundle> = {
     seamless: SeamlessBundle,
     color_correct: ColorCorrectBundle,
     frame_skip: FrameSkipBundle,
+    vector: VectorBundle,
     optimize: OptimizeBundle,
     outline: OutlineBundle,
     drop_shadow: DropShadowBundle,

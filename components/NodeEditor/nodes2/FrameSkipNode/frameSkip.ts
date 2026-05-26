@@ -8,7 +8,7 @@ export const processFrameSkip: NodeProcessor = async (node, inputs) => {
         return input; 
     }
 
-    const config = node.data || {};
+    const config = (node as any).data || {};
     const keepEvery = Math.max(1, typeof config.keepEvery === 'number' ? config.keepEvery : 2);
     let offset = typeof config.offset === 'number' ? config.offset : 0;
     

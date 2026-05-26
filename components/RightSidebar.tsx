@@ -24,8 +24,8 @@ const RightSidebar: React.FC<RightSidebarProps> = ({
 
   // --- OUTPUT SELECTION LOGIC ---
   const allOutputs = useMemo(() => {
-      return (currentAnim?.nodeGraph.nodes.filter(n => n.type === 'output') as OutputNode[]) || [];
-  }, [currentAnim?.nodeGraph.nodes]);
+      return (currentAnim?.nodeGraph?.nodes?.filter(n => n.type === 'output') as OutputNode[]) || [];
+  }, [currentAnim?.nodeGraph?.nodes]);
 
   const [localActiveOutputId, setLocalActiveOutputId] = useState<string | null>(null);
 
@@ -85,7 +85,7 @@ const RightSidebar: React.FC<RightSidebarProps> = ({
       } else {
           // Fallback to searching for the first timeline node in graph to control global playback
           // if we are viewing a static image derived from a timeline
-          const tNode = currentAnim?.nodeGraph.nodes.find(n => n.type === 'timeline') as TimelineNode;
+          const tNode = currentAnim?.nodeGraph?.nodes?.find(n => n.type === 'timeline') as TimelineNode;
           if (tNode) {
               settings = {
                   fps: tNode.data.fps,
@@ -99,17 +99,23 @@ const RightSidebar: React.FC<RightSidebarProps> = ({
   }, [nodeOutputs, activeOutputNode, currentAnim]);
 
   const handleUpdateTimeline = (updates: any) => {
-      // We need to find WHICH timeline node produced this output to update it.
-      // Simplify: Update ALL timeline nodes, or the one connected?
-      // Better: Update the 'primary' timeline found in the graph, as that drives the system.
       if (currentAnim) {
-          // If we have a specific timeline input payload, we can't easily trace back to the exact Node ID here 
-          // without graph traversal.
-          // For now, we update ALL timeline nodes to keep sync, or just the first one.
           const tNodes = currentAnim.nodeGraph.nodes.filter(n => n.type === 'timeline') as TimelineNode[];
-          const newNodes = currentAnim.nodeGraph.nodes.map(n => {
+          
+          let mappedUpdates = { ...updates };
+          if (mappedUpdates.currentFrame !== undefined) {
+              const payload = activeOutputNode && nodeOutputs?.[activeOutputNode.id];
+              if (payload && payload.type === 'TIMELINE' && payload.unmutedMap) {
+                 const actualIndex = payload.unmutedMap[mappedUpdates.currentFrame];
+                 if (actualIndex !== undefined) {
+                     mappedUpdates.currentFrame = actualIndex;
+                 }
+              }
+          }
+
+          const newNodes = (currentAnim.nodeGraph?.nodes || []).map(n => {
               if (n.type === 'timeline') {
-                  return { ...n, data: { ...n.data, ...updates } };
+                  return { ...n, data: { ...n.data, ...mappedUpdates } };
               }
               return n;
           });
@@ -124,7 +130,7 @@ const RightSidebar: React.FC<RightSidebarProps> = ({
   };
 
   // --- PINNED NODES LOGIC ---
-  const pinnedNodes = currentAnim?.nodeGraph.nodes.filter(n => n.pinnedAt !== undefined) || [];
+  const pinnedNodes = currentAnim?.nodeGraph?.nodes?.filter(n => n.pinnedAt !== undefined) || [];
   
   const sortedPinnedNodes = [...pinnedNodes].sort((a, b) => {
       const ta = a.pinnedAt || 0;

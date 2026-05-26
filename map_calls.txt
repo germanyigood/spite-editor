@@ -1,0 +1,76 @@
+components/common/design-system/ContextMenu.tsx:93:                {config.items.map((item, index) => {
+components/panels/LayerListPanel.tsx:31:            {layers.map((layer) => (
+components/panels/LayoutPropertiesPanel.tsx:100:                        {['box', 'slice9', 'text'].map(t => (
+components/panels/AnimationListPanel.tsx:50:        {animations.map((anim) => {
+components/panels/AnimationListPanel.tsx:82:                    {layoutElements.map(el => (
+components/panels/AnimationListPanel.tsx:92:                    {sourceLayers.map(({source, slice}) => {
+components/panels/AnimationListPanel.tsx:116:                                                {frames.map((frame, idx) => (
+components/panels/DrawModifierPanel.tsx:40:        const nodes = entry.nodeGraph.nodes.map(n => n.id === id ? { ...n, disabled } : n);
+components/panels/DrawModifierPanel.tsx:148:            {chain.map((node) => {
+components/NodeEditor/nodes2/CropNode/crop.ts:54:        const croppedFrames = await Promise.all(input.frames.map(cropSingle));
+components/NodeEditor/nodes2/CropNode/crop.ts:61:             const croppedFrames = await Promise.all(input.previewFrames.map(cropSingle));
+components/NodeEditor/nodes2/DropShadowNode/dropShadow.ts:52:        const results = await Promise.all(input.frames.map(generate));
+components/NodeEditor/nodes2/DropShadowNode/dropShadow.ts:59:             const results = await Promise.all(input.previewFrames.map(generate));
+components/NodeEditor/nodes2/ColorCorrectNode/colorCorrect.ts:36:        const results = await Promise.all(input.frames.map(generate));
+components/NodeEditor/nodes2/ColorCorrectNode/colorCorrect.ts:43:             const results = await Promise.all(input.previewFrames.map(generate));
+components/NodeEditor/nodes2/FrameSkipNode/frameSkip.ts:40:        const frameKeys = Object.keys(originalFramesDict).map(Number).sort((a, b) => a - b);
+components/NodeEditor/nodes2/FillNode/fill.ts:39:        const results = await Promise.all(input.frames.map(generate));
+components/NodeEditor/nodes2/FillNode/fill.ts:46:             const results = await Promise.all(input.previewFrames.map(generate));
+components/NodeEditor/nodes2/VectorNode/VectorNode.tsx:21:        const newPaths = node.data.paths.map(p => ({ ...p, [key]: value }));
+components/NodeEditor/nodes2/TimelineNode/TimelineNode.tsx:49:                {!isDisconnected && previewFrames.map((src, i) => {
+components/NodeEditor/nodes2/index.ts:95:    const nextNodes = nodes.map(n => n.id === nodeId ? { ...n, ...updates } as NodeData : n);
+components/NodeEditor/nodes2/SeamlessNode/seamless.ts:29:        const results = await Promise.all(input.frames.map(generate));
+components/NodeEditor/nodes2/NormalMapNode/normalMap.ts:31:        const maps = await Promise.all(input.frames.map(generate));
+components/NodeEditor/nodes2/NormalMapNode/normalMap.ts:52:            const maps = await Promise.all(input.previewFrames.map(generate));
+components/NodeEditor/nodes2/CompositeNode/CompositeNode.tsx:42:                         {['cover', 'contain', 'stretch'].map((m) => (
+components/NodeEditor/nodes2/OutlineNode/outline.ts:127:        const results = await Promise.all(input.frames.map(generate));
+components/NodeEditor/nodes2/OutlineNode/outline.ts:134:             const results = await Promise.all(input.previewFrames.map(generate));
+components/NodeEditor/nodes2/FrameNormalizeNode/frameNormalize.ts:63:            const promises = input.previewFrames.map(normalizeSingle);
+components/NodeEditor/nodes2/FrameNormalizeNode/frameNormalize.ts:91:        const promises = input.frames.map(normalizeSingle);
+components/NodeEditor/nodes2/PixelizeNode/pixelize.ts:193:                            const [r, g, b] = winner.split(',').map(Number);
+components/NodeEditor/nodes2/PixelizeNode/pixelize.ts:247:        const results = await Promise.all(input.frames.map(processSingle));
+components/NodeEditor/nodes2/PixelizeNode/pixelize.ts:255:             const results = await Promise.all(input.previewFrames.map(processSingle));
+components/NodeEditor/nodes2/ResizeNode/resize.ts:66:        const resizedFramesResults = await Promise.all(input.frames.map(async (f) => {
+components/NodeEditor/nodes2/ResizeNode/resize.ts:74:            resizedMeta = input.framesMetadata.map((m) => {
+components/NodeEditor/nodes2/ResizeNode/resize.ts:85:            resizedMeta = validFrames.map((_, i) => ({
+components/NodeEditor/nodes2/ResizeNode/resize.ts:173:            const res = await Promise.all(input.previewFrames.map(f => resizeSingle(f, newFrameW, newFrameH)));
+components/NodeEditor/common/NodeWrapper.tsx:314:                    {inputKeys.map((handleId, i) => {
+components/NodeEditor/common/NodeWrapper.tsx:342:                    {outputKeys.map((handleId, i) => (
+components/NodeEditor/NodeGraph.tsx:160:            return rawNodes.map(n => n.id === dragState.id ? { ...n, x: dragState.initialX! + localDragOffset.dx / transform.scale, y: dragState.initialY! + localDragOffset.dy / transform.scale } : n);
+components/NodeEditor/NodeGraph.tsx:165:            return rawNodes.map(n => {
+components/NodeEditor/NodeGraph.tsx:301:                    {connections.map(c => {
+components/NodeEditor/NodeGraph.tsx:327:                {nodes.map(n => {
+components/NodeEditor/NodeGraph.tsx:347:                            connectedInputs={connections.filter(c => c.target === n.id).map(c => c.targetHandle || 'input')}
+components/NodeEditor/NodeGraph.tsx:348:                            connectedOutputs={connections.filter(c => c.source === n.id).map(c => c.sourceHandle || 'output')}
+components/NodeEditor/hooks/useGraphInteraction.ts:134:                    const nextNodes = curNodes.map(n => n.id === ds.id ? { ...n, x: ds.initialX! + dx / curTransform.scale, y: ds.initialY! + dy / curTransform.scale } : n);
+components/NodeEditor/hooks/useGraphInteraction.ts:145:                    const nextNodes = curNodes.map(n => {
+components/NodeEditor/hooks/useGraphInteraction.ts:177:                    const nextNodes = curNodes.map(n => n.id === ds.id ? { ...n, x: ds.initialX! + dOffset.dx / curTransform.scale, y: ds.initialY! + dOffset.dy / curTransform.scale } : n);
+components/NodeEditor/hooks/useGraphInteraction.ts:183:                    const nextNodes = curNodes.map(n => {
+components/NodeEditor/graphExport.ts:52:    const bitmaps = await Promise.all(frames.map(loadBitmap));
+components/NodeEditor/graphExport.ts:73:    const nodeMap = new Map(nodes.map(n => [n.id, n]));
+components/NodeEditor/graphExport.ts:159:                        meta.frames = payload.frames.map((_, i) => ({
+components/NodeEditor/graphExport.ts:182:                        meta.frames = framesList.map(f => ({
+components/sprite-editor/LayerRenderer.tsx:198:                    {(livePaths || vectorNode.data.paths).map(path => (
+components/sprite-editor/LayerRenderer.tsx:203:                                    path.points.slice(1).map((pt, i) => {
+components/sprite-editor/LayerRenderer.tsx:220:                            {path.id === selectedPathId && path.points.map((pt, i) => (
+components/sprite-editor/FrameOverlay.tsx:40:            {activeConfig.frames.map((frame, i) => {
+components/sprite-editor/FrameOverlay.tsx:71:                                        const newNodes = entry.nodeGraph.nodes.map(n => n.id === tNode.id ? updatedNode : n);
+components/SpriteEditor.tsx:234:            {layers.map(({source}) => {
+components/StartupTestRunner.tsx:148:            failedExpectations: result.failedExpectations?.map((f: any) => ({ message: f.message, stack: f.stack })) || []
+components/RightSidebar.tsx:116:          const newNodes = currentAnim.nodeGraph.nodes.map(n => {
+components/RightSidebar.tsx:208:                                    {allOutputs.map(node => (
+components/RightSidebar.tsx:241:                            sortedPinnedNodes.map(node => {
+components/LayoutEditor/LayoutEditor.tsx:279:                {currentAnim?.layout.elements.map(el => {
+components/VideoProcessorModal.tsx:147:    setSegments(prev => prev.map(s => {
+components/VideoProcessorModal.tsx:294:            setSegments(prev => prev.map(s => {
+components/VideoProcessorModal.tsx:543:                      {segments.map(seg => {
+components/VideoProcessorModal.tsx:606:                           {segments.map((seg, i) => {
+components/Timeline.tsx:307:          const nextMutedIndices = newMutedArray.map((m, i) => m ? i : -1).filter(i => i !== -1);
+components/Timeline.tsx:401:          const nextMutedIndices = newMuted.map((m, i) => m ? i : -1).filter(i => i !== -1);
+components/Timeline.tsx:402:          const newSelected = new Set(movedFrames.map((_, i) => adjustedDropTarget + i));
+components/Timeline.tsx:443:                        {allTimelineNodes.map(node => (
+components/Timeline.tsx:483:                        const extractedFrames = targets.map(t => newFrames[t]).reverse();
+components/Timeline.tsx:484:                        const extractedMuted = targets.map(t => newMutedArray[t]).reverse();
+components/Timeline.tsx:490:                        const nextMutedIndices = newMutedArray.map((m, i) => m ? i : -1).filter(i => i !== -1);
+components/Timeline.tsx:543:                  {frames.map((_, i) => (
+components/Timeline.tsx:564:                      {frames.map((sourceFrameIdx, index) => {

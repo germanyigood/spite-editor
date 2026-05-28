@@ -83,22 +83,25 @@ export const MainWorkspace: React.FC = () => {
 
     // --- GLOBAL DRAG AND DROP HANDLERS ---
     useEffect(() => {
-        const resetDragState = () => { setIsDraggingFile(false); dragCounter.current = 0; };
-        const onDragEnter = (e: DragEvent) => { e.preventDefault(); dragCounter.current++; if (e.dataTransfer?.types.includes('Files')) setIsDraggingFile(true); };
-        const onDragLeave = (e: DragEvent) => { e.preventDefault(); dragCounter.current--; if (dragCounter.current <= 0 || !e.relatedTarget) resetDragState(); };
-        const onDragOver = (e: DragEvent) => { e.preventDefault(); if (!isDraggingFile && e.dataTransfer?.types.includes('Files')) setIsDraggingFile(true); };
-        const onDrop = (e: DragEvent) => { e.preventDefault(); e.stopPropagation(); resetDragState(); if (e.dataTransfer?.files && e.dataTransfer.files.length > 0) handleFileLoad(e.dataTransfer.files[0]); };
-        window.addEventListener('dragenter', onDragEnter, true);
-        window.addEventListener('dragleave', onDragLeave, true);
-        window.addEventListener('dragover', onDragOver, true);
-        window.addEventListener('drop', onDrop, true);
-        window.addEventListener('dragend', resetDragState, true);
+        const onPaste = (e: ClipboardEvent) => {
+            if (e.clipboardData?.files && e.clipboardData.files.length > 0) {
+                e.preventDefault();
+                handleFileLoad(e.clipboardData.files[0]);
+            } else if (e.clipboardData?.items) {
+                for (let i = 0; i < e.clipboardData.items.length; i++) {
+                    if (e.clipboardData.items[i].type.indexOf('image') !== -1) {
+                        e.preventDefault();
+                        const file = e.clipboardData.items[i].getAsFile();
+                        if (file) handleFileLoad(file);
+                        break;
+                    }
+                }
+            }
+        };
+
+        window.addEventListener('paste', onPaste, true);
         return () => {
-            window.removeEventListener('dragenter', onDragEnter, true);
-            window.removeEventListener('dragleave', onDragLeave, true);
-            window.removeEventListener('dragover', onDragOver, true);
-            window.removeEventListener('drop', onDrop, true);
-            window.removeEventListener('dragend', resetDragState, true);
+            window.removeEventListener('paste', onPaste, true);
         };
     }, [handleFileLoad, isDraggingFile]);
 
@@ -175,7 +178,13 @@ export const MainWorkspace: React.FC = () => {
     const mainPanel = <MainViewportStack toolMode={toolMode} nodeOutputs={nodeOutputs} currentAnim={currentAnim} layerCount={layerCount} onFileLoad={handleFileLoad} />;
 
     return (
-        <div className="h-full w-full flex flex-col bg-transparent text-txt-primary overflow-hidden relative">
+        <div 
+            className="h-full w-full flex flex-col bg-transparent text-txt-primary overflow-hidden relative"
+            onDragEnter={(e) => { e.preventDefault(); dragCounter.current++; if (e.dataTransfer?.types.includes('Files')) setIsDraggingFile(true); }}
+            onDragLeave={(e) => { e.preventDefault(); dragCounter.current--; if (dragCounter.current <= 0 || !e.currentTarget.contains(e.relatedTarget as Node)) { setIsDraggingFile(false); dragCounter.current = 0; } }}
+            onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); if (!isDraggingFile && e.dataTransfer?.types.includes('Files')) setIsDraggingFile(true); }}
+            onDrop={(e) => { e.preventDefault(); e.stopPropagation(); setIsDraggingFile(false); dragCounter.current = 0; if (e.dataTransfer?.files && e.dataTransfer.files.length > 0) handleFileLoad(e.dataTransfer.files[0]); }}
+        >
             <GlobalDropOverlay isVisible={isDraggingFile} />
             <E2EEngine 
                 ref={e2eEngineRef} 

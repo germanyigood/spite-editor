@@ -70,14 +70,15 @@ export const InfiniteCanvas = forwardRef<HTMLDivElement, InfiniteCanvasProps>(({
             onMouseLeave={onMouseLeave}
             onMouseEnter={onMouseEnter}
         >
-            {/* Background Checkerboard */}
+            {/* Background Dots */}
             <div 
-                className="absolute inset-0 pointer-events-none checkerboard" 
+                className="absolute inset-0 opacity-20 pointer-events-none" 
                 style={{ 
+                    backgroundImage: 'radial-gradient(circle, var(--tw-gradient-from) 1px, transparent 1px)', 
+                    '--tw-gradient-from': 'rgb(var(--c-text-muted))',
                     backgroundPosition: `${transform.x}px ${transform.y}px`,
-                    backgroundSize: `${gridSize * transform.scale}px ${gridSize * transform.scale}px`,
-                    opacity: 0.1
-                }} 
+                    backgroundSize: `${gridSize * transform.scale}px ${gridSize * transform.scale}px`
+                } as any} 
             />
 
             {/* Content Container */}

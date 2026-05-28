@@ -3,23 +3,22 @@ import { Simulator, E2EScenario } from '../../tools/packages/aistudio-e2e';
 export const timeline_advanced_workflow: E2EScenario = {
     id: 'timeline_advanced_workflow',
     description: 'Verify advanced timeline operations: multiple selection, muting, duplicating, deleting and reversing selected frames.',
+    setup: [
+        { name: 'Reset Workspace', action: async () => { window.__E2E_RESET__?.(); await new Promise(r => setTimeout(r, 500)); } },
+        { name: 'Inject Test Asset', action: async () => {
+            await Simulator.injectTestImage('TIMELINE_ADV_TEST.png');
+            // slice it
+            await Simulator.type('[data-testid="num-input-cols"]', '2');
+            await Simulator.type('[data-testid="num-input-rows"]', '2');
+            await new Promise(r => setTimeout(r, 500));
+        } }
+    ],
     steps: [
         {
             name: 'Wait for App Load and add Frames',
             timeoutMs: 8000,
             action: async () => {
                 await Simulator.waitFor('.custom-scrollbar');
-                // Assume the initial setup gives us a timeline with 0,1,2 frame indices.
-                // We'll trust the base test state or wait for frames to exist.
-                // The Timeline might be empty initially, let's wait for at least 1 frame or a "Timeline Empty" string.
-            }
-        },
-        {
-            name: 'Add Some Frames if Needed (Placeholder)',
-            action: async () => {
-                // Actually, the default graph for E2E loads some nodes. 
-                // Let's assume we have frames because of the initial Load.
-                // If there are no frames, this test might need a specific mock initialization.
             }
         },
         {
@@ -33,7 +32,7 @@ export const timeline_advanced_workflow: E2EScenario = {
                 await Simulator.click(f0);
                 
                 // Shift click 3rd
-                const ev = new MouseEvent('mousedown', {
+                const ev = new PointerEvent('pointerdown', {
                     bubbles: true,
                     cancelable: true,
                     shiftKey: true

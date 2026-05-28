@@ -6,12 +6,13 @@ import { NodePayload, PaintNode, PaintConfig, ViewportTransform, WarpNode, Sourc
 
 import { LayerRenderer } from './sprite-editor/LayerRenderer';
 import { FrameOverlay } from './sprite-editor/FrameOverlay';
+import { AnimationAlignmentOverlay } from './sprite-editor/AnimationAlignmentOverlay';
 import { useSpriteInteraction } from './sprite-editor/useSpriteInteraction';
 import { SelectionOverlay } from './sprite-editor/SelectionOverlay';
 import { InfiniteCanvas } from './common/InfiniteCanvas';
 
 // Icons
-import { Brush, Eraser, BoxSelect, PaintBucket, Square, Circle, PenTool, MousePointer2, Plus, Minus, CornerUpRight } from 'lucide-react';
+import { Brush, Eraser, BoxSelect, PaintBucket, Square, Circle, PenTool, MousePointer2, Plus, Minus, CornerUpRight, Hand, Move } from 'lucide-react';
 import { ColorPicker, Slider } from './common/DesignSystem';
 
 interface SpriteEditorProps {
@@ -28,6 +29,16 @@ const SpriteEditor: React.FC<SpriteEditorProps> = ({ nodeOutputs = {}, style, cl
   const containerRef = useRef<HTMLDivElement>(null);
   const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 });
   
+  useEffect(() => {
+      if (entry) {
+          if (toolMode === 'animation') {
+              setTransform(entry.animationCamera || { x: 0, y: 0, scale: 1 });
+          } else {
+              setTransform(entry.editorTransform || { x: 0, y: 0, scale: 1 });
+          }
+      }
+  }, [entry?.id, toolMode]);
+
   const paintNode = useMemo(() => {
       if (!entry || !activeLayerId) return undefined;
       return findModifierByType(entry.nodeGraph, activeLayerId, 'paint') as PaintNode | undefined;
@@ -43,7 +54,7 @@ const SpriteEditor: React.FC<SpriteEditorProps> = ({ nodeOutputs = {}, style, cl
       return findModifierByType(entry.nodeGraph, activeLayerId, 'warp') as WarpNode | undefined;
   }, [entry?.nodeGraph, activeLayerId]);
 
-  const [drawTool, setDrawTool] = useState<'brush' | 'eraser' | 'select' | 'bucket' | 'rect' | 'ellipse' | 'path' | 'path-select' | 'path-add' | 'path-delete' | 'path-convert'>('brush');
+  const [drawTool, setDrawTool] = useState<'brush' | 'eraser' | 'select' | 'bucket' | 'rect' | 'ellipse' | 'path' | 'path-select' | 'path-add' | 'path-delete' | 'path-convert' | 'pan'>('brush');
   const [selectionRect, setSelectionRect] = useState<{x:number, y:number, w:number, h:number} | null>(null);
 
   const [brushSettings, setBrushSettings] = useState<PaintConfig>({
@@ -79,12 +90,18 @@ const SpriteEditor: React.FC<SpriteEditorProps> = ({ nodeOutputs = {}, style, cl
 
   const { handleMouseDown, handleSelectionMouseDown, handleFrameMouseDown, handleWarpPinMouseDown, isPanning, visualFrame, visualLayerPos, visualPins } = useSpriteInteraction(
       containerRef, transform, setTransform, entry, activeLayerId, activeSource, activeConfig, layers, warpNode, selectionRect,
-      toolMode === 'draw' && drawTool === 'select' ? setSelectionRect : undefined
+      toolMode === 'draw' && drawTool === 'select' ? setSelectionRect : undefined,
+      toolMode === 'draw' && drawTool === 'pan',
+      toolMode === 'draw' && drawTool === 'move'
   );
 
   const handleTransformChange = (newTransform: ViewportTransform) => {
       setTransform(newTransform);
-      dispatch({ type: 'UPDATE_EDITOR_TRANSFORM', payload: { animId: entry.id, transform: newTransform } });
+      if (toolMode === 'animation') {
+          dispatch({ type: 'UPDATE_ANIMATION_TRANSFORM', payload: { animId: entry.id, transform: newTransform } });
+      } else {
+          dispatch({ type: 'UPDATE_EDITOR_TRANSFORM', payload: { animId: entry.id, transform: newTransform } });
+      }
   };
 
   const updatePaintNode = (updates: Partial<PaintConfig>) => {
@@ -94,7 +111,7 @@ const SpriteEditor: React.FC<SpriteEditorProps> = ({ nodeOutputs = {}, style, cl
       dispatch({ type: 'UPDATE_NODE_DATA', payload: { animId: entry.id, nodeId: paintNode.id, data: updates } });
   };
 
-  const setLocalDrawTool = (tool: 'brush' | 'eraser' | 'select' | 'bucket' | 'rect' | 'ellipse' | 'path' | 'path-select' | 'path-add' | 'path-delete' | 'path-convert') => {
+  const setLocalDrawTool = (tool: 'brush' | 'eraser' | 'select' | 'bucket' | 'rect' | 'ellipse' | 'path' | 'path-select' | 'path-add' | 'path-delete' | 'path-convert' | 'pan') => {
       setDrawTool(tool);
       if (tool !== 'select') {
           updatePaintNode({ isEraser: tool === 'eraser', drawTool: tool as any });
@@ -214,7 +231,7 @@ const SpriteEditor: React.FC<SpriteEditorProps> = ({ nodeOutputs = {}, style, cl
       }
   }, [selectionRect, activeSource, entry, nodeOutputs, paintNode, dispatch]);
 
-  const cursorStyle = isPanning ? 'cursor-grabbing' : (toolMode === 'draw' && (drawTool === 'brush' || drawTool === 'eraser' || drawTool === 'bucket' || drawTool === 'rect' || drawTool === 'ellipse' || (drawTool && drawTool.startsWith('path'))) ? 'cursor-none' : 'cursor-default');
+  const cursorStyle = isPanning ? 'cursor-grabbing' : (toolMode === 'draw' && drawTool === 'pan' ? 'cursor-grab' : (toolMode === 'move_layer' || (toolMode === 'draw' && drawTool === 'move') ? 'cursor-move' : (toolMode === 'draw' && (drawTool === 'brush' || drawTool === 'eraser' || drawTool === 'bucket' || drawTool === 'rect' || drawTool === 'ellipse' || (drawTool && drawTool.startsWith('path'))) ? 'cursor-none' : 'cursor-default')));
 
   return (
     <div className={`w-full h-full relative ${className || ''}`} style={style}>
@@ -231,7 +248,7 @@ const SpriteEditor: React.FC<SpriteEditorProps> = ({ nodeOutputs = {}, style, cl
             onMouseEnter={() => setIsHoveringEditor(true)}
             onMouseLeave={() => setIsHoveringEditor(false)}
         >
-            {layers.map(({source}) => {
+            {toolMode !== 'animation' && layers.map(({source}) => {
                 const isDraggingThis = visualLayerPos && visualLayerPos.id === source.id;
                 const override = isDraggingThis ? visualLayerPos : undefined;
                 const isActive = activeLayerId === source.id;
@@ -270,6 +287,21 @@ const SpriteEditor: React.FC<SpriteEditorProps> = ({ nodeOutputs = {}, style, cl
                     onFrameMouseDown={handleFrameMouseDown}
                 />
             )}
+
+            {activeSource && activeConfig && toolMode === 'animation' && (
+                <AnimationAlignmentOverlay 
+                    activeSource={activeSource as SourceNode} 
+                    sliceNode={activePair?.slice!}
+                    activeConfig={activeConfig} 
+                    selectedFrameIndex={state.selectedFrameIndex} 
+                    scale={transform.scale} 
+                    processedImageSource={
+                        (activePair?.slice && nodeOutputs[activePair.slice.id]?.type === 'IMAGE_SEQUENCE') 
+                            ? (nodeOutputs[activePair.slice.id] as any).image 
+                            : null
+                    }
+                />
+            )}
         </InfiniteCanvas>
 
         {toolMode === 'draw' && isHoveringEditor && (drawTool === 'brush' || drawTool === 'eraser') && cursorPos && (
@@ -302,6 +334,8 @@ const SpriteEditor: React.FC<SpriteEditorProps> = ({ nodeOutputs = {}, style, cl
         {toolMode === 'draw' && (
             <div className="absolute bottom-10 left-1/2 -translate-x-1/2 flex items-center gap-2 p-2 bg-panel/90 backdrop-blur-2xl rounded-2xl border border-white/10 shadow-2xl z-[100] animate-in slide-in-from-bottom-5">
                 <div className="flex bg-surface/50 p-1 rounded-xl gap-1">
+                    <button data-testid="draw-tool-move" onClick={() => setLocalDrawTool('move')} className={`p-2 rounded-lg transition-all ${drawTool === 'move' ? 'bg-cyan-600 text-white shadow-lg' : 'text-txt-secondary hover:text-white'}`} title="Move Tool (V)"><Move size={18} /></button>
+                    <div className="w-px h-6 bg-white/10 mx-1 self-center" />
                     <button data-testid="draw-tool-brush" onClick={() => setLocalDrawTool('brush')} className={`p-2 rounded-lg transition-all ${drawTool === 'brush' ? 'bg-pink-600 text-white shadow-lg' : 'text-txt-secondary hover:text-white'}`} title="Brush Tool (B)"><Brush size={18} /></button>
                     <button data-testid="draw-tool-eraser" onClick={() => setLocalDrawTool('eraser')} className={`p-2 rounded-lg transition-all ${drawTool === 'eraser' ? 'bg-red-600 text-white shadow-lg shadow-red-900/40' : 'text-txt-secondary hover:text-white'}`} title="Eraser Tool (E)"><Eraser size={18} /></button>
                     <button data-testid="draw-tool-bucket" onClick={() => setLocalDrawTool('bucket')} className={`p-2 rounded-lg transition-all ${drawTool === 'bucket' ? 'bg-pink-600 text-white shadow-lg' : 'text-txt-secondary hover:text-white'}`} title="Paint Bucket (G)"><PaintBucket size={18} /></button>
@@ -309,6 +343,8 @@ const SpriteEditor: React.FC<SpriteEditorProps> = ({ nodeOutputs = {}, style, cl
                     <button data-testid="draw-tool-ellipse" onClick={() => setLocalDrawTool('ellipse')} className={`p-2 rounded-lg transition-all ${drawTool === 'ellipse' ? 'bg-pink-600 text-white shadow-lg' : 'text-txt-secondary hover:text-white'}`} title="Ellipse Tool (O)"><Circle size={18} /></button>
                     <button data-testid="draw-tool-path" onClick={() => setLocalDrawTool('path')} className={`p-2 rounded-lg transition-all ${drawTool.startsWith('path') && drawTool !== 'path-select' ? 'bg-fuchsia-600 text-white shadow-lg' : 'text-txt-secondary hover:text-white'}`} title="Path Tool (P)"><PenTool size={18} /></button>
                     <button data-testid="draw-tool-select" onClick={() => setLocalDrawTool('select')} className={`p-2 rounded-lg transition-all ${drawTool === 'select' ? 'bg-indigo-600 text-white shadow-lg' : 'text-txt-secondary hover:text-white'}`} title="Selection Tool (S)"><BoxSelect size={18} /></button>
+                    <div className="w-px h-6 bg-white/10 mx-1 self-center" />
+                    <button data-testid="draw-tool-pan" onClick={() => setLocalDrawTool('pan')} className={`p-2 rounded-lg transition-all ${drawTool === 'pan' ? 'bg-cyan-600 text-white shadow-lg' : 'text-txt-secondary hover:text-white'}`} title="Pan Tool (Space + Drag)"><Hand size={18} /></button>
                 </div>
                 
                 {drawTool.startsWith('path') && (
@@ -324,7 +360,7 @@ const SpriteEditor: React.FC<SpriteEditorProps> = ({ nodeOutputs = {}, style, cl
                     </>
                 )}
                 
-                {drawTool !== 'select' && !drawTool.startsWith('path-') && drawTool !== 'path' && (
+                {drawTool !== 'select' && !drawTool.startsWith('path-') && drawTool !== 'path' && drawTool !== 'pan' && drawTool !== 'move' && (
                     <>
                         <div className="w-px h-8 bg-white/5 mx-2" />
                         <div className="w-32 px-2">

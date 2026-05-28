@@ -21,8 +21,10 @@ import { draw_path_workflow } from './scenarios/draw_path_workflow';
 import { vector_tools_workflow } from './scenarios/vector_tools_workflow';
 import { chroma_key_workflow } from './scenarios/chroma_key_workflow';
 import { undo_redo_workflow } from './scenarios/undo_redo_workflow';
+import { rename_frame_workflow } from './scenarios/rename_frame';
 
 export const E2E_SCENARIOS: E2EScenario[] = [
+    rename_frame_workflow,
     selection_extract_workflow,
     grid_slicing_workflow,
     basic_workflow,

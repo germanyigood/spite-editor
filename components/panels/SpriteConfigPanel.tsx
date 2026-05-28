@@ -102,7 +102,7 @@ const SpriteConfigPanel: React.FC<SpriteConfigPanelProps> = ({
   return (
     <div className="p-4 bg-surface/30 border-t border-border-base/10 space-y-3 backdrop-blur-sm">
         <div className="flex items-center justify-between text-indigo-400 text-xs font-bold uppercase tracking-wider pb-2 border-b border-border-base/5">
-            <div className="flex items-center gap-2"><Move size={14}/> Frame #{selectedFrameIndex}</div>
+            <div className="flex flex-1 items-center gap-2 truncate pr-2"><Move size={14} className="shrink-0"/> <span className="truncate uppercase">{selectedFrame.name || `Frame #${selectedFrameIndex}`}</span></div>
             <div className="flex items-center gap-2">
                 <button 
                     onClick={handleExtract}

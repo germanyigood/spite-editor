@@ -426,8 +426,38 @@ export const projectReducer = (state: ProjectState, action: Action): ProjectStat
     case 'SELECT_NODE':
       return { ...state, selectedNodeId: action.payload };
 
-    case 'SELECT_FRAME':
-      return { ...state, selectedFrameIndex: action.payload };
+    case 'SELECT_FRAME': {
+      let nextState = { ...state, selectedFrameIndex: action.payload };
+      const anim = nextState.animations.find(a => a.id === nextState.activeAnimationId);
+      if (anim) {
+          const timelineNode = anim.nodeGraph.nodes.find(n => n.type === 'timeline') as any;
+          if (timelineNode && timelineNode.data.frames) {
+              const frames = timelineNode.data.frames as number[];
+              const currentTIndex = timelineNode.data.currentFrame ?? 0;
+              // If the current timeline cursor doesn't already point to the selected frame, find an instance in timeline and jump there
+              if (frames[currentTIndex] !== action.payload) {
+                  const firstInstance = frames.indexOf(action.payload);
+                  if (firstInstance !== -1) {
+                      nextState.selectedTimelineIndex = firstInstance;
+                      nextState.animations = nextState.animations.map(a => {
+                          if (a.id !== anim.id) return a;
+                          return {
+                              ...a,
+                              nodeGraph: {
+                                  ...a.nodeGraph,
+                                  nodes: a.nodeGraph.nodes.map(n => n.id === timelineNode.id ? {
+                                      ...n,
+                                      data: { ...n.data, currentFrame: firstInstance }
+                                  } : n)
+                              }
+                          };
+                      });
+                  }
+              }
+          }
+      }
+      return nextState;
+    }
 
     case 'SELECT_TIMELINE_FRAME':
         return { ...state, selectedTimelineIndex: action.payload };
@@ -466,6 +496,12 @@ export const projectReducer = (state: ProjectState, action: Action): ProjectStat
       return {
           ...state,
           animations: state.animations.map(a => a.id === action.payload.animId ? { ...a, editorTransform: action.payload.transform } : a)
+      };
+
+    case 'UPDATE_ANIMATION_TRANSFORM':
+      return {
+          ...state,
+          animations: state.animations.map(a => a.id === action.payload.animId ? { ...a, animationCamera: action.payload.transform } : a)
       };
 
     case 'UPDATE_LAYOUT_CAMERA':

@@ -18,7 +18,7 @@ export const undo_redo_workflow: E2EScenario = {
         {
             name: 'Undo Action',
             action: async () => {
-                await Simulator.click('[data-testid="undo-btn"]');
+                await Simulator.click('[data-testid="btn-undo"]');
                 await new Promise(r => setTimeout(r, 1000));
             }
         },
@@ -35,7 +35,7 @@ export const undo_redo_workflow: E2EScenario = {
         {
             name: 'Redo Action',
             action: async () => {
-                await Simulator.click('[data-testid="redo-btn"]');
+                await Simulator.click('[data-testid="btn-redo"]');
                 await new Promise(r => setTimeout(r, 1000));
             }
         },

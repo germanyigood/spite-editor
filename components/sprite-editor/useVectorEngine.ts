@@ -23,6 +23,12 @@ export const useVectorEngine = ({
     const [selectedPathId, setSelectedPathId] = useState<string | null>(null);
     const [selectedPointIndex, setSelectedPointIndex] = useState<number | null>(null);
     const [livePaths, setLivePaths] = useState<VectorPath[] | null>(null);
+    const livePathsRef = useRef<VectorPath[] | null>(null);
+
+    const updateLivePaths = useCallback((newPaths: VectorPath[] | null) => {
+        livePathsRef.current = newPaths;
+        setLivePaths(newPaths);
+    }, []);
 
     const intState = useRef<VectorInteractionState>('idle');
     const dragData = useRef<any>(null);
@@ -33,7 +39,7 @@ export const useVectorEngine = ({
         e.stopPropagation();
         (e.target as HTMLElement).setPointerCapture(e.pointerId);
 
-        const paths = livePaths || vectorNode.data.paths || [];
+        const paths = livePathsRef.current || livePaths || vectorNode.data.paths || [];
         let newPaths = JSON.parse(JSON.stringify(paths)) as VectorPath[];
         
         const altKey = e.altKey;
@@ -56,6 +62,8 @@ export const useVectorEngine = ({
 
         for (let i = newPaths.length - 1; i >= 0; i--) {
             const p = newPaths[i];
+            
+            if (!p || !p.points) continue;
             
             // First check if points/handles are hit
             for (let j = 0; j < p.points.length; j++) {
@@ -137,7 +145,8 @@ export const useVectorEngine = ({
         
         if (isDeleteTool) {
             if (hitPathId && hitPointIndex !== -1 && !hitHandle) {
-                const path = newPaths.find(p => p.id === hitPathId)!;
+                const path = newPaths.find(p => p.id === hitPathId);
+                if (!path || !path.points) return;
                 path.points.splice(hitPointIndex, 1);
                 updatedData = true;
                 setSelectedPointIndex(null);
@@ -146,7 +155,9 @@ export const useVectorEngine = ({
             if (hitPathId && hitPointIndex !== -1) {
                 setSelectedPathId(hitPathId);
                 setSelectedPointIndex(hitPointIndex);
-                const pt = newPaths.find(p => p.id === hitPathId)!.points[hitPointIndex];
+                const path = newPaths.find(p => p.id === hitPathId);
+                if (!path || !path.points) return;
+                const pt = path.points[hitPointIndex];
                 
                 if (hitHandle) {
                     pt.broken = true;
@@ -170,9 +181,11 @@ export const useVectorEngine = ({
                     intState.current = 'drag-handle';
                     dragData.current = { pathId: hitPathId, ptIndex: hitPointIndex, handle: hitHandle };
                 } else {
+                    const path = newPaths.find(p=>p.id===hitPathId);
+                    if (!path || !path.points) return;
                     setSelectedPointIndex(hitPointIndex);
                     intState.current = 'drag-point';
-                    dragData.current = { pathId: hitPathId, ptIndex: hitPointIndex, startX: texX, startY: texY, initPt: { ...newPaths.find(p=>p.id===hitPathId)!.points[hitPointIndex] } };
+                    dragData.current = { pathId: hitPathId, ptIndex: hitPointIndex, startX: texX, startY: texY, initPt: { ...path.points[hitPointIndex] } };
                 }
             } else {
                 setSelectedPathId(null);
@@ -184,7 +197,8 @@ export const useVectorEngine = ({
                 setSelectedPathId(hitPathId);
                 setSelectedPointIndex(hitPointIndex !== -1 ? hitPointIndex : null);
             } else if (hitPathId && hitPointIndex !== -1 && hitPathId === selectedPathId && !isAddTool) {
-                const path = newPaths.find(p => p.id === hitPathId)!;
+                const path = newPaths.find(p => p.id === hitPathId);
+                if (!path || !path.points) return;
                 if (!hitHandle) {
                     if (hitPointIndex === 0 && !path.closed && path.points.length > 2) {
                         path.closed = true;
@@ -205,7 +219,8 @@ export const useVectorEngine = ({
                 }
             } else if (isAddTool && hitPathId === selectedPathId && hitPointIndex === -1) {
                 // Adding a point to the currently selected path curve
-                const path = newPaths.find(p => p.id === hitPathId)!;
+                const path = newPaths.find(p => p.id === hitPathId);
+                if (!path || !path.points) return;
                 // Simple insert: just append, or find closest segment
                 // For simplicity, find closest segment by distance to line segments
                 let bestIdx = path.points.length - 1;
@@ -259,20 +274,23 @@ export const useVectorEngine = ({
         }
 
         if (updatedData) {
+            updateLivePaths(newPaths);
             dispatch({ type: 'UPDATE_NODE_DATA', payload: { animId, nodeId: vectorNode.id, data: { paths: newPaths } } });
         }
-    }, [isActive, vectorNode, dispatch, animId, selectedPathId, scale]);
+    }, [isActive, vectorNode, dispatch, animId, selectedPathId, currentDrawTool, updateLivePaths]);
 
     const handlePointerMove = useCallback((e: React.PointerEvent<HTMLCanvasElement>, texX: number, texY: number) => {
         if (!isActive || intState.current === 'idle' || !vectorNode) return;
         
-        const paths = livePaths || vectorNode.data.paths || [];
+        const paths = livePathsRef.current || livePaths || vectorNode.data.paths || [];
         let newPaths = JSON.parse(JSON.stringify(paths)) as VectorPath[];
         
         const { pathId, ptIndex, handle, initPt } = dragData.current;
-        const path = newPaths.find(p => p.id === pathId);
-        if (!path) return;
+        const path = newPaths.find(p => p && p.id === pathId);
+        if (!path || !path.points) return;
         const pt = path.points[ptIndex];
+
+        if (!pt) return;
 
         if (intState.current === 'drag-new-handle') {
             const dx = texX - dragData.current.startX;
@@ -308,21 +326,21 @@ export const useVectorEngine = ({
             if (pt.cp2x !== undefined) { pt.cp2x = initPt.cp2x + dx; pt.cp2y = initPt.cp2y + dy; }
         }
 
-        setLivePaths(newPaths);
-    }, [isActive, vectorNode, livePaths]);
+        updateLivePaths(newPaths);
+    }, [isActive, vectorNode, updateLivePaths]);
 
     const handlePointerUp = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
         if (!isActive) return;
         (e.target as HTMLElement).releasePointerCapture(e.pointerId);
         
-        if (intState.current !== 'idle' && livePaths) {
-            dispatch({ type: 'UPDATE_NODE_DATA', payload: { animId, nodeId: vectorNode?.id, data: { paths: livePaths } } });
-            setLivePaths(null);
+        if (intState.current !== 'idle' && livePathsRef.current) {
+            dispatch({ type: 'UPDATE_NODE_DATA', payload: { animId, nodeId: vectorNode?.id, data: { paths: livePathsRef.current } } });
+            updateLivePaths(null);
         }
         
         intState.current = 'idle';
         dragData.current = null;
-    }, [isActive, livePaths, dispatch, animId, vectorNode]);
+    }, [isActive, dispatch, animId, vectorNode, updateLivePaths]);
 
     const handleContextMenu = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
          if (!isActive || !vectorNode) return;

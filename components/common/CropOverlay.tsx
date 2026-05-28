@@ -11,6 +11,7 @@ interface CropRect {
 interface CropOverlayProps {
   rect: CropRect;
   onUpdate: (rect: CropRect) => void;
+  onDragEnd?: () => void;
   containerScale?: number; // How to map mouse delta to value (1 for 1:1, or >1 if zooming)
   color?: string; // Tailwind color class prefix (e.g. 'yellow', 'blue')
   label?: string;
@@ -23,7 +24,8 @@ interface CropOverlayProps {
 
 const CropOverlay: React.FC<CropOverlayProps> = ({ 
   rect, 
-  onUpdate, 
+  onUpdate,
+  onDragEnd,
   containerScale = 1, 
   color = 'yellow', 
   label,
@@ -50,6 +52,10 @@ const CropOverlay: React.FC<CropOverlayProps> = ({
     
     e.stopPropagation();
     e.preventDefault();
+    
+    if (document.activeElement instanceof HTMLElement) {
+        document.activeElement.blur();
+    }
     
     setDragState({
       type,
@@ -113,8 +119,11 @@ const CropOverlay: React.FC<CropOverlayProps> = ({
   }, [dragState, onUpdate, containerScale, minWidth, minHeight, bounds]);
 
   const handleMouseUp = useCallback(() => {
+    if (dragState && onDragEnd) {
+      onDragEnd();
+    }
     setDragState(null);
-  }, []);
+  }, [dragState, onDragEnd]);
 
   useEffect(() => {
     if (dragState) {

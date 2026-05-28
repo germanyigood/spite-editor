@@ -1,5 +1,5 @@
 
-import React, { useRef, useState, useEffect, useLayoutEffect, useMemo } from 'react';
+import React, { useRef, useState, useEffect, useLayoutEffect, useMemo, useCallback } from 'react';
 import { CropNode as CropNodeType, NodePayload } from '../../../../types';
 import { NumberInput, Section, Toggle } from '../../../common/DesignSystem';
 import CropOverlay from '../../../common/CropOverlay';
@@ -22,6 +22,12 @@ export const CropNode: React.FC<CropNodeProps> = React.memo(({ node, onUpdate, i
     const containerRef = useRef<HTMLDivElement>(null);
     const [containerSize, setContainerSize] = useState<{w: number, h: number} | null>(null);
     const [imageNaturalSize, setImageNaturalSize] = useState<{w: number, h: number} | null>(null);
+    const [localRect, setLocalRect] = useState<{x: number, y: number, width: number, height: number} | null>(null);
+
+    const activeConfig = useMemo(() => {
+        if (localRect) return { ...config, ...localRect };
+        return config;
+    }, [config, localRect]);
 
     const src = useMemo(() => {
         if (!input) return null;
@@ -81,8 +87,8 @@ export const CropNode: React.FC<CropNodeProps> = React.memo(({ node, onUpdate, i
 
     const visualRect = useMemo(() => {
         if (!layout) return { x: 0, y: 0, w: 0, h: 0 };
-        return { x: layout.offsetX + (config.x * layout.scale), y: layout.offsetY + (config.y * layout.scale), w: config.width * layout.scale, h: config.height * layout.scale };
-    }, [layout, config.x, config.y, config.width, config.height]);
+        return { x: layout.offsetX + (activeConfig.x * layout.scale), y: layout.offsetY + (activeConfig.y * layout.scale), w: activeConfig.width * layout.scale, h: activeConfig.height * layout.scale };
+    }, [layout, activeConfig.x, activeConfig.y, activeConfig.width, activeConfig.height]);
 
     const handleVisualUpdate = (rect: {x:number, y:number, w:number, h:number}) => {
         if (!layout || !imageNaturalSize) return;
@@ -90,8 +96,15 @@ export const CropNode: React.FC<CropNodeProps> = React.memo(({ node, onUpdate, i
         const newY = Math.round((rect.y - layout.offsetY) / layout.scale);
         const newW = Math.round(rect.w / layout.scale);
         const newH = Math.round(rect.h / layout.scale);
-        updateConfig({ x: newX, y: newY, width: Math.max(1, newW), height: Math.max(1, newH) });
+        setLocalRect({ x: newX, y: newY, width: Math.max(1, newW), height: Math.max(1, newH) });
     };
+
+    const handleDragEnd = useCallback(() => {
+        if (localRect) {
+            updateConfig(localRect);
+            setLocalRect(null);
+        }
+    }, [localRect]);
 
     return (
         <div className="flex flex-col h-full bg-surface/5">
@@ -107,7 +120,7 @@ export const CropNode: React.FC<CropNodeProps> = React.memo(({ node, onUpdate, i
                             <div style={{ position: 'absolute', left: layout.offsetX, top: layout.offsetY, width: layout.renderW, height: layout.renderH, pointerEvents: 'none' }}>
                                 <BitmapView image={src} mode="contain" className="w-full h-full object-contain" />
                             </div>
-                            <CropOverlay rect={visualRect} onUpdate={handleVisualUpdate} color="amber" label={`${config.width}x${config.height}`} bounds={{ w: containerSize?.w || 0, h: containerSize?.h || 0 }} />
+                            <CropOverlay rect={visualRect} onUpdate={handleVisualUpdate} onDragEnd={handleDragEnd} color="amber" label={`${activeConfig.width}x${activeConfig.height}`} bounds={{ w: containerSize?.w || 0, h: containerSize?.h || 0 }} />
                         </>
                     )
                 )}
@@ -115,10 +128,10 @@ export const CropNode: React.FC<CropNodeProps> = React.memo(({ node, onUpdate, i
             <div className="p-3 border-t border-border-base/10 space-y-4 shrink-0 bg-surface/30 overflow-y-auto custom-scrollbar max-h-[50%]">
                 <Section title="Crop Area" defaultOpen={true}>
                     <div className="grid grid-cols-2 gap-2">
-                        <NumberInput label="Width" min={1} value={config.width} onChange={(v) => updateConfig({ width: Math.max(1, v) })} accent="amber" />
-                        <NumberInput label="Height" min={1} value={config.height} onChange={(v) => updateConfig({ height: Math.max(1, v) })} accent="amber" />
-                        <NumberInput label="X" value={config.x} onChange={(v) => updateConfig({ x: v })} accent="amber" />
-                        <NumberInput label="Y" value={config.y} onChange={(v) => updateConfig({ y: v })} accent="amber" />
+                        <NumberInput label="Width" min={1} value={activeConfig.width} onChange={(v) => updateConfig({ width: Math.max(1, v) })} accent="amber" />
+                        <NumberInput label="Height" min={1} value={activeConfig.height} onChange={(v) => updateConfig({ height: Math.max(1, v) })} accent="amber" />
+                        <NumberInput label="X" value={activeConfig.x} onChange={(v) => updateConfig({ x: v })} accent="amber" />
+                        <NumberInput label="Y" value={activeConfig.y} onChange={(v) => updateConfig({ y: v })} accent="amber" />
                     </div>
                 </Section>
                 <Section title="Post-process">

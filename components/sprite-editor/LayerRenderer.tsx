@@ -195,7 +195,9 @@ export const LayerRenderer = React.memo(({
             />
             {canInteractWithVector && vectorNode && (livePaths || vectorNode.data.paths) && (
                 <svg className="absolute top-0 left-0 w-full h-full pointer-events-none" viewBox={`0 0 ${logicalW} ${logicalH}`}>
-                    {(livePaths || vectorNode.data.paths).map(path => (
+                    {((livePaths || vectorNode.data.paths) || []).map(path => {
+                        if (!path || !path.points) return null;
+                        return (
                         <g key={path.id}>
                             {/* Path outlines in UI (so you see it even without stroke) */}
                             <path 
@@ -249,7 +251,8 @@ export const LayerRenderer = React.memo(({
                                 </g>
                             ))}
                         </g>
-                    ))}
+                        );
+                    })}
                 </svg>
             )}
         </div>

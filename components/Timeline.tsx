@@ -192,7 +192,10 @@ const Timeline: React.FC<TimelineProps> = ({ generatedFrames, nodeOutputs }) => 
       if (idx !== activeTimelineNode?.data.currentFrame) {
           updateTimeline({ currentFrame: idx });
       }
-  }, [frames.length, activeTimelineNode?.data.currentFrame, selectedTimelineIndex, dispatch, updateTimeline]);
+      if (frames[idx] !== undefined) {
+          dispatch({ type: 'SELECT_FRAME', payload: frames[idx] });
+      }
+  }, [frames, activeTimelineNode?.data.currentFrame, selectedTimelineIndex, dispatch, updateTimeline]);
 
   const handleFrameClick = useCallback((e: MouseEvent | PointerEvent, index: number) => {
       setSelectedIndices(prev => {

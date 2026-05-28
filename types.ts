@@ -93,7 +93,7 @@ export interface PaintConfig {
     brushOpacity: number;
     brushHardness: number; // 0 = Hard, 1 = Soft
     isEraser: boolean; // Deprecated by drawTool, but kept for compatibility
-    drawTool?: 'brush' | 'eraser' | 'bucket' | 'rect' | 'ellipse' | 'path' | 'path-select' | 'path-add' | 'path-delete' | 'path-convert';
+    drawTool?: 'brush' | 'eraser' | 'bucket' | 'rect' | 'ellipse' | 'path' | 'path-select' | 'path-add' | 'path-delete' | 'path-convert' | 'pan' | 'move';
     paintData?: string; // Base64 of the painted layer
     sourceSrc?: string; // The source image string this paint data is based on
 }
@@ -431,9 +431,10 @@ export interface AnimationEntry {
   layout: LayoutConfig; 
   editorTransform?: ViewportTransform; // Sprite Editor Camera
   layoutCamera?: ViewportTransform; // Layout Editor Camera (Independent)
+  animationCamera?: ViewportTransform; // Animation Alignment Camera (Independent)
 }
 
-export type ToolMode = 'select' | 'move_layer' | 'nodes' | 'picker' | 'draw' | 'layout';
+export type ToolMode = 'select' | 'move_layer' | 'nodes' | 'picker' | 'draw' | 'layout' | 'animation';
 
 // --- Processor Types ---
 
@@ -504,6 +505,7 @@ export type ProjectAction =
   | { type: 'UPDATE_NODE_GRAPH'; payload: { animId: string; graph: NodeGraphData } }
   | { type: 'UPDATE_NODE_DATA'; payload: { animId: string; nodeId: string; data: any } } // ATOMIC UPDATE
   | { type: 'UPDATE_EDITOR_TRANSFORM'; payload: { animId: string; transform: ViewportTransform } }
+  | { type: 'UPDATE_ANIMATION_TRANSFORM'; payload: { animId: string; transform: ViewportTransform } }
   | { type: 'UPDATE_LAYOUT_CAMERA'; payload: { animId: string; transform: ViewportTransform } }
   | { type: 'SET_UI_PANEL_SIZE'; payload: Partial<ProjectUIState> }
   // Layout Actions

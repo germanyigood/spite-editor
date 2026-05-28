@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Layers, Crosshair, Trash2, MousePointer2, Move, PlusSquare, Workflow, Bug, Sun, Moon, Brush, Undo2, Redo2, LayoutTemplate } from 'lucide-react';
+import { Layers, Crosshair, Trash2, MousePointer2, Move, PlusSquare, Workflow, Bug, Sun, Moon, Brush, Undo2, Redo2, LayoutTemplate, Film } from 'lucide-react';
 import { useProject } from '../context/ProjectContext';
 import { useTheme } from '../context/ThemeContext';
 import { getGraphLayers } from '../utils';
@@ -120,7 +120,7 @@ const Header: React.FC<HeaderProps> = ({ onOpenDebug }) => {
                 <button 
                     onClick={history.undo} 
                     disabled={!history.canUndo}
-                    data-testid="undo-btn"
+                    data-testid="btn-undo"
                     className="p-1.5 rounded-lg text-txt-muted hover:text-txt-primary hover:bg-surface/20 disabled:opacity-30 disabled:hover:bg-transparent transition-all"
                     title="Undo (Ctrl+Z)"
                 >
@@ -129,7 +129,7 @@ const Header: React.FC<HeaderProps> = ({ onOpenDebug }) => {
                 <button 
                     onClick={history.redo} 
                     disabled={!history.canRedo}
-                    data-testid="redo-btn"
+                    data-testid="btn-redo"
                     className="p-1.5 rounded-lg text-txt-muted hover:text-txt-primary hover:bg-surface/20 disabled:opacity-30 disabled:hover:bg-transparent transition-all"
                     title="Redo (Ctrl+Y)"
                 >
@@ -167,6 +167,14 @@ const Header: React.FC<HeaderProps> = ({ onOpenDebug }) => {
                     title="Select & Edit Frames (V)"
                     >
                         <MousePointer2 size={14} /> <span>Frames</span>
+                    </button>
+                    <button 
+                    data-testid="tool-animation"
+                    onClick={() => dispatch({ type: 'SET_TOOL_MODE', payload: 'animation' })}
+                    className={`px-4 py-1.5 rounded-full text-xs flex items-center gap-2 transition-all font-semibold ${toolMode === 'animation' ? 'bg-gradient-to-r from-green-600 to-green-500 text-white shadow-[0_0_20px_rgba(34,197,94,0.4)] ring-1 ring-white/20' : 'text-txt-secondary hover:text-txt-primary hover:bg-surface-hover/5'}`}
+                    title="Animation Frame Alignment"
+                    >
+                        <Film size={14} /> <span>Animation</span>
                     </button>
                     <button 
                     data-testid="tool-move"

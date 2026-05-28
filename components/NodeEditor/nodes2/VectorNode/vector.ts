@@ -34,7 +34,10 @@ export const processVector: NodeProcessor = async (node, _inputs, { loadBitmap, 
         }
     }
 
+    if (!data || !data.paths || !Array.isArray(data.paths)) return null;
+
     for (const path of data.paths) {
+        if (!path || !path.points) continue;
         if (path.points.length === 0) continue;
 
         ctx.beginPath();

@@ -113,13 +113,26 @@ const AnimationListPanel: React.FC<AnimationListPanelProps> = ({
                                             <DrawModifierPanel layerId={layerId} />
                                         ) : (
                                             <>
-                                                {frames.map((frame, idx) => (
-                                                    <div key={idx} onClick={(e) => { e.stopPropagation(); onSelectFrame(idx); }}
+                                                {frames.map((frame, idx) => {
+                                                    const frameRenameId = `frame-${layerId}-${idx}`;
+                                                    return (
+                                                    <div key={idx} onClick={(e) => { e.stopPropagation(); onSelectFrame(idx); }} onDoubleClick={(e) => { e.stopPropagation(); setRenamingId(frameRenameId); }}
+                                                        data-testid="frame-item"
                                                         className={`group/frame flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer text-[11px] border ${selectedFrameIndex === idx ? 'bg-indigo-500/20 border-indigo-500/30 text-white' : 'bg-transparent border-transparent text-txt-muted hover:text-txt-secondary'}`}>
                                                         <ScanLine size={10} className="opacity-30"/>
-                                                        <span className="truncate flex-1">{frame.name || `Frame ${idx}`}</span>
+                                                        {renamingId === frameRenameId ? (
+                                                            <input autoFocus defaultValue={frame.name || `Frame ${idx}`} onBlur={(e) => { onUpdateFrameName(idx, e.target.value); setRenamingId(null); }}
+                                                                onKeyDown={(e) => { if(e.key === 'Enter') { onUpdateFrameName(idx, (e.target as any).value); setRenamingId(null); } }}
+                                                                className="bg-surface/80 text-[11px] w-full flex-1 border border-indigo-500 rounded px-1.5 py-0.5 outline-none text-txt-primary"
+                                                                onClick={(e) => e.stopPropagation()}
+                                                                onDoubleClick={(e) => e.stopPropagation()}
+                                                                data-testid="frame-rename-input"
+                                                            />
+                                                        ) : (
+                                                            <span data-testid="frame-name" className="truncate flex-1">{frame.name || `Frame ${idx}`}</span>
+                                                        )}
                                                     </div>
-                                                ))}
+                                                )})}
                                                 <button onClick={(e) => { e.stopPropagation(); onAddFrame(); }} className="flex items-center gap-2 px-2 py-1.5 rounded-md text-[10px] text-txt-muted hover:text-indigo-500 transition-all">
                                                     <Plus size={10} /> Add Frame
                                                 </button>

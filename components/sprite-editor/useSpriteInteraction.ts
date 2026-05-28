@@ -14,7 +14,9 @@ export const useSpriteInteraction = (
     layers: Array<{ source: SourceNode }>,
     warpNode: WarpNode | undefined,
     selectionRect: {x:number, y:number, w:number, h:number} | null,
-    onSelectionChange?: (rect: {x:number,y:number,w:number,h:number} | null) => void
+    onSelectionChange?: (rect: {x:number,y:number,w:number,h:number} | null) => void,
+    isPanToolActive: boolean = false,
+    isMoveToolActive: boolean = false
 ) => {
     const { state, dispatch } = useProject();
     const { toolMode, selectedFrameIndex } = state;
@@ -74,7 +76,8 @@ export const useSpriteInteraction = (
         const isPanClick = e.button === 1 || 
                            (e.button === 0 && isSpacePressed.current) || 
                            (e.button === 0 && e.ctrlKey) || 
-                           (e.button === 2 && e.ctrlKey);
+                           (e.button === 2 && e.ctrlKey) ||
+                           (e.button === 0 && isPanToolActive);
 
         if (isPanClick) {
             setIsPanning(true);
@@ -97,7 +100,7 @@ export const useSpriteInteraction = (
             return;
         }
 
-        if (toolMode === 'move_layer' && e.button === 0) {
+        if ((toolMode === 'move_layer' || (toolMode === 'draw' && isMoveToolActive)) && e.button === 0) {
             for (let i = layers.length - 1; i >= 0; i--) {
                 const l = layers[i].source;
                 const lx = l.data.x || 0;

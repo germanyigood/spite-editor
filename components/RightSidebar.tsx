@@ -6,6 +6,7 @@ import { useProject } from '../context/ProjectContext';
 import { NodePreviewData, TimelineNode, NodePayload, NodeData, OutputNode } from '../types';
 import { NODE_REGISTRY, RegisteredNodeType, applyNodeUpdates } from './NodeEditor/nodes2';
 import LayoutPropertiesPanel from './panels/LayoutPropertiesPanel';
+import { HotkeyScope } from '../hotkeys';
 
 interface RightSidebarProps {
   width: number;
@@ -168,7 +169,7 @@ const RightSidebar: React.FC<RightSidebarProps> = ({
   };
 
   return (
-    <aside className="h-full bg-panel/60 backdrop-blur-2xl border-l border-border-base/10 flex flex-col shrink-0 z-20 shadow-2xl relative" style={{ width }}>
+    <HotkeyScope scope="right-panel" className="bg-panel/60 backdrop-blur-2xl border-l border-border-base/10 flex flex-col shrink-0 z-20 shadow-2xl relative" onClick={() => {}} style={{ width }}>
         <div className="absolute inset-0 bg-gradient-to-b from-cyan-500/5 to-transparent pointer-events-none" />
 
         {toolMode === 'layout' ? (
@@ -322,7 +323,7 @@ const RightSidebar: React.FC<RightSidebarProps> = ({
                 </div>
             </div>
         )}
-    </aside>
+    </HotkeyScope>
   );
 };
 

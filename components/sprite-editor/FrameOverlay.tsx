@@ -83,6 +83,19 @@ export const FrameOverlay: React.FC<FrameOverlayProps> = ({
                                  x{useCount}
                              </div>
                          )}
+                         
+                         {isSelected && activeConfig.showCrosshair && (
+                             <svg width="100%" height="100%" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 20, mixBlendMode: 'difference' }}>
+                                 <line x1={effectiveFrame.width / 3} y1={0} x2={effectiveFrame.width / 3} y2={effectiveFrame.height} stroke="#ef4444" strokeWidth="1" opacity={0.8} />
+                                 <line x1={(effectiveFrame.width / 3) * 2} y1={0} x2={(effectiveFrame.width / 3) * 2} y2={effectiveFrame.height} stroke="#ef4444" strokeWidth="1" opacity={0.8} />
+                                 <line x1={0} y1={effectiveFrame.height / 3} x2={effectiveFrame.width} y2={effectiveFrame.height / 3} stroke="#ef4444" strokeWidth="1" opacity={0.8} />
+                                 <line x1={0} y1={(effectiveFrame.height / 3) * 2} x2={effectiveFrame.width} y2={(effectiveFrame.height / 3) * 2} stroke="#ef4444" strokeWidth="1" opacity={0.8} />
+                                 
+                                 <line x1={effectiveFrame.width / 2} y1={(effectiveFrame.height / 2) - 10} x2={effectiveFrame.width / 2} y2={(effectiveFrame.height / 2) + 10} stroke="#ef4444" strokeWidth="1.5" opacity={1} />
+                                 <line x1={(effectiveFrame.width / 2) - 10} y1={effectiveFrame.height / 2} x2={(effectiveFrame.width / 2) + 10} y2={effectiveFrame.height / 2} stroke="#ef4444" strokeWidth="1.5" opacity={1} />
+                                 <circle cx={effectiveFrame.width / 2} cy={effectiveFrame.height / 2} r="1.5" fill="#ef4444" />
+                             </svg>
+                         )}
                      </TransformBox>
                  );
             })}

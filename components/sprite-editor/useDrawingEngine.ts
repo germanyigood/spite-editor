@@ -282,8 +282,7 @@ export const useDrawingEngine = ({
         lastDrawnIndexRef.current = 0;
         
         flushSpline();
-        syncToNodeDebounced();
-    }, [getCoords, paintNode, syncToNodeDebounced, flushSpline, currentDrawTool]);
+    }, [getCoords, paintNode, flushSpline, currentDrawTool]);
 
     const handlePointerMove = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
         if (!isPointerDown || !paintNode) return;
@@ -357,8 +356,7 @@ export const useDrawingEngine = ({
         }
 
         flushSpline();
-        syncToNodeDebounced();
-    }, [isPointerDown, getCoords, syncToNodeDebounced, flushSpline, paintNode, currentDrawTool]);
+    }, [isPointerDown, getCoords, flushSpline, paintNode, currentDrawTool]);
 
     const handlePointerUp = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
         if (!isPointerDown || !paintNode) return;

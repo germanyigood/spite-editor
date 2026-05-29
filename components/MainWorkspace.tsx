@@ -26,6 +26,9 @@ import ErrorPopup from './common/ErrorPopup';
 import { LayoutShell } from './LayoutShell';
 import { GlobalDropOverlay } from './GlobalDropOverlay';
 
+// Hotkeys
+import { HotkeyScope } from '../hotkeys';
+
 // E2E Package
 import { E2EEngine, E2EDebugUI, StepStatus, E2EResult, E2EEngineHandle } from '../tools/packages/aistudio-e2e';
 import { E2E_SCENARIOS } from '../tests/e2e.spec';
@@ -47,9 +50,21 @@ const MainViewportStack = memo(({ toolMode, nodeOutputs, currentAnim, layerCount
     }
     return (
         <div className="w-full h-full relative overflow-hidden bg-transparent">
-            <div style={{ display: showNodes ? 'block' : 'none', width: '100%', height: '100%', position: 'absolute' }}><NodeGraph visible={showNodes} nodeOutputs={nodeOutputs} /></div>
-            <div style={{ display: showLayout ? 'block' : 'none', width: '100%', height: '100%', position: 'absolute' }}><LayoutEditor nodeOutputs={nodeOutputs} /></div>
-            <div style={{ display: showEditor ? 'block' : 'none', width: '100%', height: '100%', position: 'absolute' }}><SpriteEditor nodeOutputs={nodeOutputs} /></div>
+            <div style={{ display: showNodes ? 'block' : 'none', width: '100%', height: '100%', position: 'absolute' }}>
+                <HotkeyScope scope="node-editor" className="w-full h-full">
+                    <NodeGraph visible={showNodes} nodeOutputs={nodeOutputs} />
+                </HotkeyScope>
+            </div>
+            <div style={{ display: showLayout ? 'block' : 'none', width: '100%', height: '100%', position: 'absolute' }}>
+                <HotkeyScope scope="layout-editor" className="w-full h-full">
+                    <LayoutEditor nodeOutputs={nodeOutputs} />
+                </HotkeyScope>
+            </div>
+            <div style={{ display: showEditor ? 'block' : 'none', width: '100%', height: '100%', position: 'absolute' }}>
+                <HotkeyScope scope="sprite-editor" className="w-full h-full">
+                    <SpriteEditor nodeOutputs={nodeOutputs} />
+                </HotkeyScope>
+            </div>
         </div>
     );
 });
@@ -84,26 +99,33 @@ export const MainWorkspace: React.FC = () => {
     // --- GLOBAL DRAG AND DROP HANDLERS ---
     useEffect(() => {
         const onPaste = (e: ClipboardEvent) => {
+            const now = Date.now();
+            if ((window as any).__LAST_PASTE_TIME && now - (window as any).__LAST_PASTE_TIME < 500) return; // Debounce pasting
+            
             if (e.clipboardData?.files && e.clipboardData.files.length > 0) {
                 e.preventDefault();
+                (window as any).__LAST_PASTE_TIME = now;
                 handleFileLoad(e.clipboardData.files[0]);
             } else if (e.clipboardData?.items) {
                 for (let i = 0; i < e.clipboardData.items.length; i++) {
                     if (e.clipboardData.items[i].type.indexOf('image') !== -1) {
                         e.preventDefault();
                         const file = e.clipboardData.items[i].getAsFile();
-                        if (file) handleFileLoad(file);
+                        if (file) {
+                            (window as any).__LAST_PASTE_TIME = now;
+                            handleFileLoad(file);
+                        }
                         break;
                     }
                 }
             }
         };
 
-        window.addEventListener('paste', onPaste, true);
+        window.addEventListener('paste', onPaste);
         return () => {
-            window.removeEventListener('paste', onPaste, true);
+            window.removeEventListener('paste', onPaste);
         };
-    }, [handleFileLoad, isDraggingFile]);
+    }, [handleFileLoad]);
 
     const handleRunE2E = useCallback((scenarioId: string) => {
         setE2EStepState(prev => ({ ...prev, [scenarioId]: { setup: {}, steps: {} } }));

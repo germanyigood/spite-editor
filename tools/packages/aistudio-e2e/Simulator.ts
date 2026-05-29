@@ -448,4 +448,24 @@ export const Simulator = {
     window.__E2E_INJECT_IMAGE__(canvas.toDataURL(), name);
     await this.waitForText(name);
   },
+
+  async dispatchKeyboardEvent(
+    el: HTMLElement | Document | Element,
+    type: "keydown" | "keyup" | "keypress",
+    key: string,
+    code: string = key,
+    options: KeyboardEventInit = {}
+  ) {
+    const eventParams: KeyboardEventInit = {
+      key,
+      code,
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+      ...options,
+    };
+    const ev = new KeyboardEvent(type, eventParams);
+    el.dispatchEvent(ev);
+    await new Promise((r) => setTimeout(r, Math.random() * 50 + 50));
+  },
 };

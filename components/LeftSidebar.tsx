@@ -8,6 +8,7 @@ import { createDefaultGraph } from '../context/ProjectContext';
 import { Frame, SpriteConfig } from '../types';
 import { getGraphLayers, generateGridFrames } from '../utils';
 import { ExportType } from './panels/ExportPanel';
+import { useActionHandler, HotkeyScope } from '../hotkeys';
 
 interface LeftSidebarProps {
   onImportFile: (file: File) => void;
@@ -74,8 +75,20 @@ const LeftSidebar: React.FC<LeftSidebarProps> = ({ onImportFile, onExport, copyS
       handleUpdateConfig(nc);
   };
 
+  useActionHandler('left-panel', 'core.delete', () => {
+      if (currentAnim) {
+          if (selectedLayoutElementId) {
+              dispatch({ type: 'REMOVE_LAYOUT_ELEMENT', payload: { animId: currentAnim.id, elementId: selectedLayoutElementId } });
+          } else if (selectedFrameIndex !== null) {
+              handleDeleteFrame(selectedFrameIndex);
+          } else if (activeLayerId) {
+              dispatch({ type: 'REMOVE_LAYER', payload: { animId: currentAnim.id, layerId: activeLayerId } });
+          }
+      }
+  }, [currentAnim, activeLayerId, selectedFrameIndex, selectedLayoutElementId, dispatch]);
+
   return (
-    <aside className="w-80 bg-panel/60 backdrop-blur-2xl border-r border-border-base/10 flex flex-col shrink-0 z-20 shadow-[10px_0_30px_rgba(0,0,0,0.05)] relative transition-colors duration-300">
+    <HotkeyScope scope="left-panel" className="h-full w-80 bg-panel/60 backdrop-blur-2xl border-r border-border-base/10 flex flex-col shrink-0 z-20 shadow-[10px_0_30px_rgba(0,0,0,0.05)] relative transition-colors duration-300">
       <div className="flex-1 flex flex-col min-h-0 relative z-10">
         <div className="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-4">
             <AnimationListPanel 
@@ -115,7 +128,7 @@ const LeftSidebar: React.FC<LeftSidebarProps> = ({ onImportFile, onExport, copyS
       <div className="shrink-0 p-5 border-t border-border-base/10 bg-panel/40 relative z-10">
             <ExportPanel onExport={onExport} copySuccess={copySuccess} disabled={layers.length === 0} />
       </div>
-    </aside>
+    </HotkeyScope>
   );
 };
 

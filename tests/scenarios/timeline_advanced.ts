@@ -2,6 +2,7 @@ import { Simulator, E2EScenario } from '../../tools/packages/aistudio-e2e';
 
 export const timeline_advanced_workflow: E2EScenario = {
     id: 'timeline_advanced_workflow',
+    name: 'Advanced Timeline Operations',
     description: 'Verify advanced timeline operations: multiple selection, muting, duplicating, deleting and reversing selected frames.',
     setup: [
         { name: 'Reset Workspace', action: async () => { window.__E2E_RESET__?.(); await new Promise(r => setTimeout(r, 500)); } },
@@ -32,12 +33,25 @@ export const timeline_advanced_workflow: E2EScenario = {
                 await Simulator.click(f0);
                 
                 // Shift click 3rd
-                const ev = new PointerEvent('pointerdown', {
+                const rect = f2.getBoundingClientRect();
+                const evConfig = {
                     bubbles: true,
                     cancelable: true,
-                    shiftKey: true
-                });
-                f2.dispatchEvent(ev);
+                    shiftKey: true,
+                    button: 0,
+                    buttons: 1,
+                    pointerId: 1,
+                    isPrimary: true,
+                    clientX: rect.left + rect.width / 2,
+                    clientY: rect.top + rect.height / 2,
+                };
+                f2.dispatchEvent(new PointerEvent('pointerdown', evConfig));
+                await new Promise(r => setTimeout(r, 50));
+                window.dispatchEvent(new PointerEvent('pointerup', {
+                    ...evConfig,
+                    buttons: 0
+                }));
+                await new Promise(r => setTimeout(r, 50));
             }
         },
         {
@@ -73,7 +87,7 @@ export const timeline_advanced_workflow: E2EScenario = {
                 await new Promise(r => setTimeout(r, 100));
                 
                 // Check if eye-off icons appeared
-                const eyeOffIcons = document.querySelectorAll('.text-red-500.bg-panel\\/80');
+                const eyeOffIcons = document.querySelectorAll('.text-red-500.bg-panel\\/85');
                 if (eyeOffIcons.length < 3) {
                     throw new Error(`Expected at least 3 muted frames, got ${eyeOffIcons.length}`);
                 }

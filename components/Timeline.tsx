@@ -4,6 +4,7 @@ import { useProject } from '../context/ProjectContext';
 import { TimelineNode, ImageSource, NodePayload } from '../types';
 import { BitmapView } from './common/BitmapView';
 import { ContextMenu, ContextMenuConfig } from './common/design-system/ContextMenu';
+import { useActionHandler, HotkeyScope } from '../hotkeys';
 
 interface TimelineProps {
   generatedFrames: ImageSource[];
@@ -348,6 +349,12 @@ const Timeline: React.FC<TimelineProps> = ({ generatedFrames, nodeOutputs }) => 
       setContextMenuConfig(null);
   }, [currentFrameIndex, updateTimeline]);
 
+  useActionHandler('timeline', 'core.delete', () => {
+      if (selectedIndicesRef.current.size > 0) {
+          performAction('delete', Array.from(selectedIndicesRef.current)[0]);
+      }
+  }, [performAction]);
+
   const handleContextMenu = useCallback((e: React.MouseEvent, index: number) => {
       e.preventDefault();
       e.stopPropagation();
@@ -621,12 +628,15 @@ const Timeline: React.FC<TimelineProps> = ({ generatedFrames, nodeOutputs }) => 
   const activePayload = activeTimelineNode ? nodeOutputs[activeTimelineNode.id] : null;
 
   return (
-    <div 
-        ref={containerRef}
+    <HotkeyScope scope="timeline"
         className="flex flex-col h-full bg-panel border-t border-border-base/10 select-none relative z-20 shadow-[0_-10px_40px_rgba(0,0,0,0.2)] text-txt-primary"
         onClick={() => setContextMenuConfig(null)}
-        onMouseLeave={() => setIsScrubbing(false)}
     >
+      <div 
+        ref={containerRef}
+        className="flex flex-col flex-1 h-full relative"
+        onMouseLeave={() => setIsScrubbing(false)}
+      >
       
       {/* 1. Toolbar */}
       <div className="flex items-center justify-between px-4 py-2 bg-panel/50 border-b border-border-base/10 shrink-0 h-10 backdrop-blur-sm">
@@ -882,7 +892,8 @@ const Timeline: React.FC<TimelineProps> = ({ generatedFrames, nodeOutputs }) => 
           onClose={() => setContextMenuConfig(null)} 
       />
 
-    </div>
+      </div>
+    </HotkeyScope>
   );
 };
 

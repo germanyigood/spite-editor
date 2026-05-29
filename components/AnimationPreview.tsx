@@ -3,6 +3,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { AnimationEntry, NodePreviewData, ImageSource } from '../types';
 import { Play, Pause, SkipBack, SkipForward, PaintBucket } from 'lucide-react';
 import { BitmapView } from './common/BitmapView';
+import { Slider } from './common/design-system/Slider';
 
 interface AnimationPreviewProps {
   currentAnim: AnimationEntry;
@@ -126,7 +127,9 @@ const AnimationPreview: React.FC<AnimationPreviewProps> = ({
         </div>
         <div className="flex items-center gap-3 bg-surface/50 p-2 rounded-xl border border-border-base/10">
           <span className="text-[9px] text-txt-muted font-bold uppercase w-10 text-center">Speed</span>
-          <input type="range" min="1" max="60" value={fps} onChange={(e) => onUpdateTimeline({ fps: parseInt(e.target.value) })} className="flex-1 h-1 bg-surface-hover/20 rounded-full appearance-none accent-indigo-500" />
+          <div className="flex-1">
+             <Slider min={1} max={60} value={fps} onChange={(v) => onUpdateTimeline({ fps: v })} debounceTime={150} />
+          </div>
           <span className="text-[10px] text-indigo-400 font-mono w-10 text-center font-bold">{fps} FPS</span>
         </div>
       </div>

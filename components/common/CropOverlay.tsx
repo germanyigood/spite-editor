@@ -51,7 +51,6 @@ const CropOverlay: React.FC<CropOverlayProps> = ({
     if (type === 'move' && disableMove) return;
     
     e.stopPropagation();
-    e.preventDefault();
     
     if (document.activeElement instanceof HTMLElement) {
         document.activeElement.blur();

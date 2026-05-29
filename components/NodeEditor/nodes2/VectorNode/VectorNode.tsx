@@ -2,6 +2,7 @@ import React from 'react';
 import { VectorNode as IVectorNode } from '../../../../types';
 import { useProject } from '../../../../context/ProjectContext';
 import { PenTool } from 'lucide-react';
+import { Slider } from '../../../common/DesignSystem';
 
 export const VectorNodeComponent: React.FC<{
     node: IVectorNode;
@@ -49,9 +50,8 @@ export const VectorNodeComponent: React.FC<{
                 </div>
             </div>
             
-            <div className="flex flex-col space-y-1 mt-1">
-                 <label className="text-[10px] tracking-wider text-txt-muted uppercase">Thickness</label>
-                 <input type="range" min={0} max={20} value={strokeWidth} onChange={(e) => handleUpdateAllPaths('strokeWidth', parseInt(e.target.value))} className="w-full accent-fuchsia-500" />
+            <div className="mt-1">
+                 <Slider label="Thickness" min={0} max={20} value={strokeWidth} onChange={(v) => handleUpdateAllPaths('strokeWidth', v)} accent="purple" />
             </div>
 
             <button 

@@ -191,23 +191,46 @@ export const AnimationAlignmentOverlay: React.FC<AnimationAlignmentOverlayProps>
             )}
             
             {/* Current Frame with Border */}
-            <FrameCanvas 
-                imageSource={imgSrc}
-                frame={currentFrame}
-                draftOffset={draftOffset}
-                onPointerDown={handlePointerDown}
-                onPointerMove={handlePointerMove}
-                onPointerUp={handlePointerUp}
-                onPointerCancel={handlePointerUp}
+            <div
                 style={{
                     position: 'absolute',
                     left: -currentFrame.width / 2,
                     top: -currentFrame.height / 2,
+                    width: currentFrame.width,
+                    height: currentFrame.height,
                     border: '1px solid #3b82f6',
                     cursor: dragging ? 'grabbing' : 'grab',
                     pointerEvents: 'auto'
                 }}
-            />
+                onPointerDown={handlePointerDown}
+                onPointerMove={handlePointerMove}
+                onPointerUp={handlePointerUp}
+                onPointerCancel={handlePointerUp}
+            >
+                <FrameCanvas 
+                    imageSource={imgSrc}
+                    frame={currentFrame}
+                    draftOffset={draftOffset}
+                    style={{
+                        position: 'absolute',
+                        left: 0,
+                        top: 0
+                    }}
+                />
+                
+                {activeConfig.showCrosshair && (
+                    <svg width="100%" height="100%" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 50, mixBlendMode: 'difference' }}>
+                        <line x1={currentFrame.width / 3} y1={0} x2={currentFrame.width / 3} y2={currentFrame.height} stroke="#ef4444" strokeWidth="1" opacity={0.8} />
+                        <line x1={(currentFrame.width / 3) * 2} y1={0} x2={(currentFrame.width / 3) * 2} y2={currentFrame.height} stroke="#ef4444" strokeWidth="1" opacity={0.8} />
+                        <line x1={0} y1={currentFrame.height / 3} x2={currentFrame.width} y2={currentFrame.height / 3} stroke="#ef4444" strokeWidth="1" opacity={0.8} />
+                        <line x1={0} y1={(currentFrame.height / 3) * 2} x2={currentFrame.width} y2={(currentFrame.height / 3) * 2} stroke="#ef4444" strokeWidth="1" opacity={0.8} />
+                        
+                        <line x1={currentFrame.width / 2} y1={(currentFrame.height / 2) - 10} x2={currentFrame.width / 2} y2={(currentFrame.height / 2) + 10} stroke="#ef4444" strokeWidth="1.5" opacity={1} />
+                        <line x1={(currentFrame.width / 2) - 10} y1={currentFrame.height / 2} x2={(currentFrame.width / 2) + 10} y2={currentFrame.height / 2} stroke="#ef4444" strokeWidth="1.5" opacity={1} />
+                        <circle cx={currentFrame.width / 2} cy={currentFrame.height / 2} r="1.5" fill="#ef4444" />
+                    </svg>
+                )}
+            </div>
         </div>
     );
 };

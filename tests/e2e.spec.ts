@@ -22,8 +22,18 @@ import { vector_tools_workflow } from './scenarios/vector_tools_workflow';
 import { chroma_key_workflow } from './scenarios/chroma_key_workflow';
 import { undo_redo_workflow } from './scenarios/undo_redo_workflow';
 import { rename_frame_workflow } from './scenarios/rename_frame';
+import { hotkeys_delete_left_panel } from './scenarios/hotkeys_delete_left_panel';
+import { hotkeys_delete_timeline } from './scenarios/hotkeys_delete_timeline';
+import { hotkeys_delete_node_editor } from './scenarios/hotkeys_delete_node_editor';
+import { hotkeys_tool_switching } from './scenarios/hotkeys_tool_switching';
+import { hotkeys_undo_redo } from './scenarios/hotkeys_undo_redo';
 
 export const E2E_SCENARIOS: E2EScenario[] = [
+    hotkeys_delete_left_panel,
+    hotkeys_delete_timeline,
+    hotkeys_delete_node_editor,
+    hotkeys_tool_switching,
+    hotkeys_undo_redo,
     rename_frame_workflow,
     selection_extract_workflow,
     grid_slicing_workflow,

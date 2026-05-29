@@ -4,6 +4,7 @@ import { ViewportTransform, NodeData, Connection, NodeType, SocketDefinition } f
 import { NODE_REGISTRY, RegisteredNodeType, applyNodeUpdates } from '../nodes2';
 import { ResizeDirection } from '../common/NodeWrapper';
 import { useProject } from '../../../context/ProjectContext';
+import { useActionHandler } from '../../../hotkeys';
 
 interface DragState {
     type: 'node' | 'edge' | 'pan' | 'resize';
@@ -293,6 +294,15 @@ export const useGraphInteraction = (
         updateGraph({ nodes: nextNodes, connections: nextConns });
         if (state.selectedNodeId === id) dispatch({ type: 'SELECT_NODE', payload: null });
     }, [state.selectedNodeId, dispatch, updateGraph]);
+
+    useActionHandler('node-editor', 'core.delete', () => {
+        if (state.selectedNodeId) {
+            const node = nodesRef.current.find(n => n.id === state.selectedNodeId);
+            if (node && !node.isDefault) {
+                handleDeleteNode(state.selectedNodeId);
+            }
+        }
+    }, [state.selectedNodeId, handleDeleteNode]);
 
     const handleDeleteConnection = useCallback((id: string) => {
         const curNodes = nodesRef.current;

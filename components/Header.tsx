@@ -5,7 +5,7 @@ import { useProject } from '../context/ProjectContext';
 import { useTheme } from '../context/ThemeContext';
 import { getGraphLayers } from '../utils';
 import { Frame } from '../types';
-import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
+import { useActionHandler } from '../hotkeys';
 import { ConfirmDialog, AlertDialog } from './common/DesignSystem';
 
 interface HeaderProps {
@@ -25,16 +25,14 @@ const Header: React.FC<HeaderProps> = ({ onOpenDebug }) => {
   const activeConfig = activePair?.slice?.data;
   const showCrosshair = activeConfig?.showCrosshair || false;
 
-  // Init Keyboard Shortcuts
-  useKeyboardShortcuts({
-      onUndo: history.undo,
-      onRedo: history.redo,
-      onSelectMode: () => dispatch({ type: 'SET_TOOL_MODE', payload: 'select' }),
-      onMoveMode: () => dispatch({ type: 'SET_TOOL_MODE', payload: 'move_layer' }),
-      onNodesMode: () => dispatch({ type: 'SET_TOOL_MODE', payload: 'nodes' }),
-      onDrawMode: () => dispatch({ type: 'SET_TOOL_MODE', payload: 'draw' }),
-      onLayoutMode: () => dispatch({ type: 'SET_TOOL_MODE', payload: 'layout' })
-  });
+  // Global Keyboard Shortcuts
+  useActionHandler('global', 'core.undo', history.undo, [history.undo]);
+  useActionHandler('global', 'core.redo', history.redo, [history.redo]);
+  useActionHandler('global', 'tool.select', () => dispatch({ type: 'SET_TOOL_MODE', payload: 'select' }), [dispatch]);
+  useActionHandler('global', 'tool.move', () => dispatch({ type: 'SET_TOOL_MODE', payload: 'move_layer' }), [dispatch]);
+  useActionHandler('global', 'tool.nodes', () => dispatch({ type: 'SET_TOOL_MODE', payload: 'nodes' }), [dispatch]);
+  useActionHandler('global', 'tool.draw', () => dispatch({ type: 'SET_TOOL_MODE', payload: 'draw' }), [dispatch]);
+  useActionHandler('global', 'tool.layout', () => dispatch({ type: 'SET_TOOL_MODE', payload: 'layout' }), [dispatch]);
 
   const handleToggleCrosshair = () => {
       if (activeAnimationId && activeLayerId && activeConfig) {

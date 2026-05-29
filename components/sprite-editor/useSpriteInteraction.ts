@@ -2,6 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useProject } from '../../context/ProjectContext';
 import { Frame, AnimationEntry, SpriteConfig, SourceNode, WarpNode } from '../../types';
+import { useActionHandler } from '../../hotkeys';
 
 export const useSpriteInteraction = (
     containerRef: React.RefObject<HTMLDivElement>,
@@ -60,16 +61,8 @@ export const useSpriteInteraction = (
 
     const isSpacePressed = useRef(false);
 
-    useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => { if (e.code === 'Space') isSpacePressed.current = true; };
-        const handleKeyUp = (e: KeyboardEvent) => { if (e.code === 'Space') isSpacePressed.current = false; };
-        window.addEventListener('keydown', handleKeyDown);
-        window.addEventListener('keyup', handleKeyUp);
-        return () => {
-            window.removeEventListener('keydown', handleKeyDown);
-            window.removeEventListener('keyup', handleKeyUp);
-        };
-    }, []);
+    useActionHandler('sprite-editor', 'canvas.pan.start', () => { isSpacePressed.current = true; }, []);
+    useActionHandler('sprite-editor', 'canvas.pan.end', () => { isSpacePressed.current = false; }, []);
 
     const handleMouseDown = (e: React.MouseEvent) => {
         const isSelectionMode = toolMode === 'draw' && onSelectionChange;
@@ -214,12 +207,6 @@ export const useSpriteInteraction = (
                     const nextPins = [...dragRef.current.initialPins];
                     nextPins[idx] = { x: dragRef.current.initialPins[idx].x + zDx, y: dragRef.current.initialPins[idx].y + zDy };
                     setVisualPins(nextPins);
-                    
-                    // REAL-TIME UPDATE: Dispatch to the graph processor during movement
-                    dispatch({ 
-                        type: 'UPDATE_NODE_DATA', 
-                        payload: { animId: entry.id, nodeId: warpNode.id, data: { pins: nextPins } } 
-                    });
                 }
             }
         };
@@ -252,6 +239,18 @@ export const useSpriteInteraction = (
 
             if (mode === 'pan') {
                 dispatch({ type: 'UPDATE_EDITOR_TRANSFORM', payload: { animId: entry.id, transform: transformRef.current } });
+            }
+
+            if (mode === 'warp_pin' && initialPins && warpNode) {
+                const idx = targetId as number;
+                if (initialPins[idx]) {
+                    const nextPins = [...initialPins];
+                    nextPins[idx] = { x: initialPins[idx].x + zDx, y: initialPins[idx].y + zDy };
+                    dispatch({ 
+                        type: 'UPDATE_NODE_DATA', 
+                        payload: { animId: entry.id, nodeId: warpNode.id, data: { pins: nextPins } } 
+                    });
+                }
             }
 
             dragRef.current = { startX: 0, startY: 0, mode: 'none' };

@@ -28,11 +28,6 @@ const DropZone: React.FC<DropZoneProps> = ({ onFileReady, message }) => {
     }
   }, [handleFile]);
 
-  React.useEffect(() => {
-    window.addEventListener('paste', handlePaste);
-    return () => window.removeEventListener('paste', handlePaste);
-  }, [handlePaste]);
-
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       handleFile(e.target.files[0]);

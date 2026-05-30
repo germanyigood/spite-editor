@@ -55,15 +55,23 @@ export const HotkeyEngineProvider: React.FC<{ children: ReactNode; defaultKeymap
                     handler();
                     e.preventDefault();
                     e.stopPropagation();
+                } else if (e.key === 'Backspace' || e.key === 'Delete') {
+                    // Prevent Backspace navigating back even if no handler is registered
+                    e.preventDefault();
                 }
             }
         };
 
         const onKeyDown = (e: KeyboardEvent) => {
-            if (e.repeat && e.key !== 'Space') return; // maybe we want to ignore repeats, except maybe for undo or arrows. Let's ignore for now. Wait, space shouldn't repeat because of pan? It will repeat space:down. That's fine.
+            if (e.repeat && e.key !== 'Space') return; 
             handleKeyEvent(e, false);
         };
-        const onKeyUp = (e: KeyboardEvent) => handleKeyEvent(e, true);
+        const onKeyUp = (e: KeyboardEvent) => {
+            // Only handle keyUp if the key normally produces a different combo, like Space:up
+            if (e.key === ' ') {
+                handleKeyEvent(e, true);
+            }
+        };
 
         window.addEventListener('keydown', onKeyDown, { capture: true });
         window.addEventListener('keyup', onKeyUp, { capture: true });

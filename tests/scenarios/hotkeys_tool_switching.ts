@@ -18,13 +18,8 @@ export const hotkeys_tool_switching: E2EScenario = {
         {
             name: 'Verify Nodes Active',
             action: async () => {
-                const btn = document.querySelector('[data-testid="tool-nodes"]');
-                if (!btn?.classList.contains('bg-indigo-500')) { // It highlights if active
-                    // Let's just check if node editor is rendered by looking for react-flow
-                    await new Promise(r => setTimeout(r, 100));
-                    const flow = document.querySelector('.react-flow');
-                    if (!flow) throw new Error("Node editor not activated");
-                }
+                const flow = await Simulator.waitFor('[data-testid="node-graph-bg"]', 5000);
+                if (!flow) throw new Error("Node editor not activated");
             }
         },
         {
@@ -37,8 +32,7 @@ export const hotkeys_tool_switching: E2EScenario = {
         {
             name: 'Verify Layout Active',
             action: async () => {
-                await new Promise(r => setTimeout(r, 100));
-                const canvas = document.querySelector('[data-testid="layout-canvas"]');
+                const canvas = await Simulator.waitFor('[data-testid="layout-canvas"]', 5000);
                 if (!canvas) throw new Error("Layout editor not activated");
             }
         },

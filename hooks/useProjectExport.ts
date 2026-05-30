@@ -148,15 +148,20 @@ export const useProjectExport = () => {
                         .replace(/"([^"]+)":/g, '$1:')
                         .replace(/\n\s{6}/g, '\n        ');
                         
+                    const atlasesStr = data.meta.atlases && Object.keys(data.meta.atlases).length > 0
+                        ? `,\n      atlases: ${JSON.stringify(data.meta.atlases, null, 6).replace(/"([^"]+)":/g, '$1:').replace(/\n\s{6}/g, '\n        ')}`
+                        : '';
+
                     if (type === 'ts' || type === 'sfts') {
                         const imgVal = type === 'ts' ? imageValueForTsCode : imageValueForSftsSfa;
-                        entries.push(`    "${data.name}": {\n      fps: ${data.meta.fps},\n      loop: ${data.meta.loop},\n      frames: ${framesJson},\n      layout: ${layoutJson},\n      image: ${imgVal}\n    }`);
+                        entries.push(`    "${data.name}": {\n      fps: ${data.meta.fps},\n      loop: ${data.meta.loop},\n      frames: ${framesJson},\n      layout: ${layoutJson}${atlasesStr},\n      image: ${imgVal}\n    }`);
                     } else if (type === 'sfa') {
                         sfaData.animations[data.name] = {
                             fps: data.meta.fps,
                             loop: data.meta.loop,
                             frames: data.meta.frames,
                             layout: layoutObj,
+                            ...(data.meta.atlases && Object.keys(data.meta.atlases).length > 0 ? { atlases: data.meta.atlases } : {}),
                             image: imageValueForSftsSfa
                         };
                     }

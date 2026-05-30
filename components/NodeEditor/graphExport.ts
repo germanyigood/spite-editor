@@ -47,6 +47,75 @@ const bitmapToBlob = async (src: ImageSource, optConfig?: OptimizeConfig): Promi
     }
 };
 
+const MAX_ATLAS_SIZE = 4096;
+
+export interface AtlasMeta {
+    texture: string;
+    startFrame: number;
+    frameCount: number;
+    width: number;
+    height: number;
+    columns: number;
+    rows: number;
+}
+
+const packFramesToAtlases = async (frames: ImageSource[], optConfig?: OptimizeConfig): Promise<{blobs: Blob[], atlases: Omit<AtlasMeta, 'texture'>[]} | null> => {
+    if (frames.length === 0) return null;
+    const bitmaps = await Promise.all(frames.map(loadBitmap));
+    const frameW = bitmaps[0].width;
+    const frameH = bitmaps[0].height;
+    
+    const columns = Math.floor(MAX_ATLAS_SIZE / frameW);
+    const rows = Math.floor(MAX_ATLAS_SIZE / frameH);
+    const framesPerAtlas = columns * rows;
+    
+    if (framesPerAtlas === 0) {
+        console.warn(`Frame size ${frameW}x${frameH} exceeds max atlas size ${MAX_ATLAS_SIZE}`);
+        return null;
+    }
+
+    const atlases: Omit<AtlasMeta, 'texture'>[] = [];
+    const blobs: Blob[] = [];
+
+    for (let startFrame = 0; startFrame < frames.length; startFrame += framesPerAtlas) {
+        const chunk = bitmaps.slice(startFrame, startFrame + framesPerAtlas);
+        const chunkFramesCount = chunk.length;
+        
+        const chunkRows = Math.ceil(chunkFramesCount / columns);
+        const atlasWidth = columns * frameW;
+        const width = chunkFramesCount < columns ? chunkFramesCount * frameW : atlasWidth; // Trim width if fewer frames than max columns
+        const height = chunkRows * frameH;
+        
+        const c = document.createElement('canvas');
+        c.width = width;
+        c.height = height;
+        const ctx = c.getContext('2d');
+        if (!ctx) continue;
+        ctx.imageSmoothingEnabled = false;
+
+        chunk.forEach((bmp, i) => {
+            const col = i % columns;
+            const row = Math.floor(i / columns);
+            ctx.drawImage(bmp, col * frameW, row * frameH);
+        });
+
+        const blob = await createPngBlob(c, optConfig);
+        if (blob) {
+            blobs.push(blob);
+            atlases.push({
+                startFrame,
+                frameCount: chunkFramesCount,
+                width,
+                height,
+                columns,
+                rows: chunkRows
+            });
+        }
+    }
+    
+    return { blobs, atlases };
+};
+
 const stitchBitmapsToBlob = async (frames: ImageSource[], optConfig?: OptimizeConfig): Promise<Blob | null> => {
     if (frames.length === 0) return null;
     const bitmaps = await Promise.all(frames.map(loadBitmap));
@@ -120,7 +189,7 @@ export const collectGraphData = async (anim: AnimationEntry) => {
     if (outputNodes.length === 0) return null;
 
     const resultBlobs: Record<string, Blob> = {};
-    const meta = { fps: 0, loop: false, width: 0, height: 0, totalFrames: 1, frames: [] as Frame[] };
+    const meta: any = { fps: 0, loop: false, width: 0, height: 0, totalFrames: 1, frames: [] as Frame[], atlases: {} };
     let metaSet = false;
 
     for (const outputNode of outputNodes) {
@@ -149,9 +218,13 @@ export const collectGraphData = async (anim: AnimationEntry) => {
                 meta.totalFrames = payload.frames.length;
             }
             if (payload.frames.length > 0) {
-                 const blob = await stitchBitmapsToBlob(payload.frames, optConfig);
-                 if (blob) {
-                     resultBlobs[key] = blob;
+                 const packResult = await packFramesToAtlases(payload.frames, optConfig);
+                 if (packResult) {
+                     packResult.blobs.forEach((blob, index) => {
+                         const objKey = packResult.blobs.length > 1 ? `${key}_${index}` : key;
+                         resultBlobs[objKey] = blob;
+                     });
+
                      if (!metaSet || key === 'default') {
                         const firstFrame = await loadBitmap(payload.frames[0]);
                         meta.width = firstFrame.width;
@@ -161,10 +234,16 @@ export const collectGraphData = async (anim: AnimationEntry) => {
                             name: payload.framesMetadata?.[i]?.name ?? `Frame ${i}`,
                             width: meta.width,
                             height: meta.height,
-                            x: i * meta.width, y: 0
+                            x: 0, y: 0 // Will be handled by the client using atlas UVs
                         }));
                         metaSet = true;
                      }
+                     
+                     // Attach atlases to this key
+                     meta.atlases[key] = packResult.atlases.map((a, index) => ({
+                         texture: packResult.blobs.length > 1 ? `${key}_${index}` : key,
+                         ...a
+                     }));
                  }
             }
         } else if (payload.type === 'IMAGE_SEQUENCE') {

@@ -182,7 +182,20 @@ const NodeGraph: React.FC<NodeGraphProps> = ({ visible = true, nodeOutputs }) =>
         
         const menuItems: ContextMenuEntry[] = [];
         
-        if (isEdgeAction) {
+        if (contextMenu.nodeId) {
+            const node = rawNodes.find(n => n.id === contextMenu.nodeId);
+            if (node && !node.isDefault) {
+                menuItems.push({
+                    id: 'delete_node',
+                    label: 'Delete Node',
+                    icon: Trash2,
+                    danger: true,
+                    onClick: () => {
+                        handleDeleteNode(contextMenu.nodeId!);
+                    }
+                });
+            }
+        } else if (isEdgeAction) {
             menuItems.push({
                 id: 'delete_connection',
                 label: 'Delete Wire',
@@ -198,6 +211,15 @@ const NodeGraph: React.FC<NodeGraphProps> = ({ visible = true, nodeOutputs }) =>
         const addNode = (type: NodeType) => {
             handleAddNode(type);
         };
+
+        if (contextMenu.nodeId) {
+            return {
+                x: contextMenu.x,
+                y: contextMenu.y,
+                header: <><span>Node</span><Trash2 size={10} className="text-red-500" /></>,
+                items: menuItems
+            };
+        }
 
         const groups = [
             [
@@ -279,7 +301,16 @@ const NodeGraph: React.FC<NodeGraphProps> = ({ visible = true, nodeOutputs }) =>
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
             onWheel={handleWheel}
-            onContextMenu={(e) => { e.preventDefault(); setContextMenu({x:e.clientX, y:e.clientY}); }}
+            onContextMenu={(e) => { 
+                e.preventDefault(); 
+                const target = e.target as HTMLElement;
+                const nodeEl = target.closest('[data-node-id]');
+                if (nodeEl) {
+                    setContextMenu({ x: e.clientX, y: e.clientY, nodeId: nodeEl.getAttribute('data-node-id')! });
+                } else {
+                    setContextMenu({x:e.clientX, y:e.clientY}); 
+                }
+            }}
             style={{ display: visible ? 'block' : 'none' }}
         >
             <div className="absolute inset-0 opacity-20 pointer-events-none" 
@@ -342,6 +373,7 @@ const NodeGraph: React.FC<NodeGraphProps> = ({ visible = true, nodeOutputs }) =>
                             icon={bundle.icon || ImageIcon}
                             colorClass={bundle.colorClass as any || 'blue'}
                             variant={(bundle as any).variant || 'default'}
+                            isSelected={state.selectedNodeId === n.id}
                             onDelete={!n.isDefault ? () => handleDeleteNode(n.id) : undefined}
                             onResize={handleResizeNode}
                             connectedInputs={connections.filter(c => c.target === n.id).map(c => c.targetHandle || 'input')}

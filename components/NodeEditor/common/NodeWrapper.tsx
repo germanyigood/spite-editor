@@ -138,8 +138,8 @@ const objectsEqual = (a?: Record<string, any>, b?: Record<string, any>) => {
 
 export const NodeWrapper = React.memo(({ 
     node, title, icon: Icon, colorClass, variant = 'default', children, onDelete, onResize, 
-    connectedInputs = [], connectedOutputs = [], onSocketDown, onUpdate, outputPayload, inputRuntimeTypes 
-}: NodeWrapperProps) => {
+    connectedInputs = [], connectedOutputs = [], onSocketDown, onUpdate, outputPayload, inputRuntimeTypes, isSelected 
+}: NodeWrapperProps & { isSelected?: boolean }) => {
     
     // Theme Colors (Adjusted for Light Mode visibility)
     const colors: Record<string, string> = {
@@ -191,8 +191,8 @@ export const NodeWrapper = React.memo(({
     
     // Container Style
     const containerStyle = isClean 
-        ? 'bg-transparent' 
-        : `bg-white/80 dark:bg-gray-900/90 border rounded-xl backdrop-blur-xl shadow-xl transition-opacity ${activeTheme} ${isDisabled ? 'opacity-60 border-gray-400 dark:border-gray-600 grayscale' : ''}`;
+        ? `bg-transparent ${isSelected ? 'ring-2 ring-blue-500 rounded-xl' : ''}`
+        : `bg-white/80 dark:bg-gray-900/90 border rounded-xl backdrop-blur-xl shadow-xl transition-opacity ${activeTheme} ${isDisabled ? 'opacity-60 border-gray-400 dark:border-gray-600 grayscale' : ''} ${isSelected ? 'ring-2 ring-blue-500 ring-offset-2 ring-offset-app' : ''}`;
     
     // Header Style
     const headerStyle = isClean
@@ -364,6 +364,7 @@ export const NodeWrapper = React.memo(({
         prev.title === next.title &&
         prev.variant === next.variant &&
         prev.outputPayload === next.outputPayload &&
+        prev.isSelected === next.isSelected &&
         arraysEqual(prev.connectedInputs, next.connectedInputs) &&
         arraysEqual(prev.connectedOutputs, next.connectedOutputs) &&
         objectsEqual(prev.inputRuntimeTypes, next.inputRuntimeTypes)

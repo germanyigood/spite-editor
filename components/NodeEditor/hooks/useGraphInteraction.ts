@@ -30,7 +30,7 @@ export const useGraphInteraction = (
     const currentAnim = animations.find(a => a.id === activeAnimationId);
 
     const [dragState, setDragState] = useState<DragState | null>(null);
-    const [contextMenu, setContextMenu] = useState<{x:number, y:number, connectionId?: string} | null>(null);
+    const [contextMenu, setContextMenu] = useState<{x:number, y:number, connectionId?: string, nodeId?: string} | null>(null);
     const [dragEdgePos, setDragEdgePos] = useState<{x:number, y:number} | null>(null);
     
     // Local state for smooth dragging without updating the whole app via context every frame
@@ -79,6 +79,15 @@ export const useGraphInteraction = (
         });
     }, [dispatch]);
 
+    const updateViewport = useCallback((viewport: ViewportTransform) => {
+        const anim = currentAnimRef.current;
+        if (!anim) return;
+        dispatch({
+            type: 'UPDATE_NODE_GRAPH_VIEWPORT',
+            payload: { animId: anim.id, viewport }
+        });
+    }, [dispatch]);
+
     const updateNodeData = useCallback((id: string, updates: Partial<NodeData>) => {
         updateGraph({ nodes: applyNodeUpdates(nodesRef.current, connectionsRef.current, id, updates) });
     }, [updateGraph]);
@@ -124,7 +133,7 @@ export const useGraphInteraction = (
                 setLocalDragOffset({ dx, dy });
                 const now = Date.now();
                 if (now - lastContextUpdateRef.current > 1000) {
-                    updateGraph({ viewport: { ...curTransform, x: ds.initialX + dx, y: ds.initialY! + dy } });
+                    updateViewport({ ...curTransform, x: ds.initialX + dx, y: ds.initialY! + dy });
                     lastContextUpdateRef.current = now;
                 }
             } 
@@ -172,7 +181,7 @@ export const useGraphInteraction = (
             const dOffset = localDragOffsetRef.current;
             if (dOffset && currentAnimRef.current) {
                 if (ds.type === 'pan' && ds.initialX !== undefined) {
-                    updateGraph({ viewport: { ...curTransform, x: ds.initialX + dOffset.dx, y: ds.initialY! + dOffset.dy } });
+                    updateViewport({ ...curTransform, x: ds.initialX + dOffset.dx, y: ds.initialY! + dOffset.dy });
                 }
                 else if (ds.type === 'node' && ds.id && ds.initialX !== undefined) {
                     const nextNodes = curNodes.map(n => n.id === ds.id ? { ...n, x: ds.initialX! + dOffset.dx / curTransform.scale, y: ds.initialY! + dOffset.dy / curTransform.scale } : n);
@@ -249,7 +258,7 @@ export const useGraphInteraction = (
             window.removeEventListener('mousemove', handleGlobalMove);
             window.removeEventListener('mouseup', handleGlobalUp);
         };
-    }, [dragState, transform, nodes, connections, updateGraph, currentAnim, getWorldPos]);
+    }, [dragState, transform, nodes, connections, updateGraph, updateViewport, currentAnim, getWorldPos]);
 
     const handleSocketDown = useCallback((e: MouseEvent, type: 'in'|'out', nodeId: string, handleId: string) => {
         if(type === 'out') {
@@ -282,8 +291,8 @@ export const useGraphInteraction = (
         if(!rect) return;
         const mx = e.clientX - rect.left, my = e.clientY - rect.top;
         const wx = (mx - curTransform.x) / curTransform.scale, wy = (my - curTransform.y) / curTransform.scale;
-        updateGraph({ viewport: { x: mx - wx * s, y: my - wy * s, scale: s } });
-    }, [containerRef, updateGraph]);
+        updateViewport({ x: mx - wx * s, y: my - wy * s, scale: s });
+    }, [containerRef, updateViewport]);
 
     const handleDeleteNode = useCallback((id: string) => {
         const curNodes = nodesRef.current;

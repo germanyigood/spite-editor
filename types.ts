@@ -503,6 +503,7 @@ export type ProjectAction =
   | { type: 'SELECT_TIMELINE_FRAME'; payload: number | null }
   | { type: 'SET_TOOL_MODE'; payload: ToolMode }
   | { type: 'UPDATE_NODE_GRAPH'; payload: { animId: string; graph: NodeGraphData } }
+  | { type: 'UPDATE_NODE_GRAPH_VIEWPORT'; payload: { animId: string; viewport: ViewportTransform } }
   | { type: 'UPDATE_NODE_DATA'; payload: { animId: string; nodeId: string; data: any } } // ATOMIC UPDATE
   | { type: 'UPDATE_EDITOR_TRANSFORM'; payload: { animId: string; transform: ViewportTransform } }
   | { type: 'UPDATE_ANIMATION_TRANSFORM'; payload: { animId: string; transform: ViewportTransform } }

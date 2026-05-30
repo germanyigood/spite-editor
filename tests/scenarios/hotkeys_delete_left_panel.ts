@@ -35,12 +35,22 @@ export const hotkeys_delete_left_panel: E2EScenario = {
             }
         },
         {
-            name: 'Verify frame was deleted',
+            name: 'Verify frame was deleted, but layer remains',
             action: async () => {
                 await new Promise(r => setTimeout(r, 500)); // wait for delete to process
                 const frames = document.querySelectorAll('[data-testid="frame-item"]');
                 if (frames.length > 0) {
-                    throw new Error("Frame 0 was not deleted!");
+                     throw new Error(`Frame was not deleted, found ${frames.length} frames`);
+                }
+                
+                // The layer should still exist
+                const animName = document.querySelector('[data-testid="anim-item-name"]');
+                if (!animName) {
+                    throw new Error("Layer/Animation was incorrectly deleted when deleting the frame!");
+                }
+                const sourceNode = document.querySelector('[data-type="source"]');
+                if (!sourceNode) {
+                    throw new Error("Source node was incorrectly deleted!");
                 }
             }
         }

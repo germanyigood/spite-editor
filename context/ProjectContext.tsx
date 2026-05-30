@@ -471,6 +471,12 @@ export const projectReducer = (state: ProjectState, action: Action): ProjectStat
           animations: state.animations.map(a => a.id === action.payload.animId ? { ...a, nodeGraph: action.payload.graph } : a)
       };
 
+    case 'UPDATE_NODE_GRAPH_VIEWPORT':
+      return {
+          ...state,
+          animations: state.animations.map(a => a.id === action.payload.animId ? { ...a, nodeGraph: { ...a.nodeGraph, viewport: action.payload.viewport } } : a)
+      };
+
     case 'UPDATE_NODE_DATA': {
         const { animId, nodeId, data } = action.payload;
         return {
@@ -631,6 +637,14 @@ const historyReducer = (state: HistoryState<ProjectState>, action: Action): Hist
             const newPresent = projectReducer(state.present, action);
             if (newPresent === state.present) return state;
             if (UNDOABLE_ACTIONS.has(action.type)) {
+                // Do not track transient timeline cursor/playback updates in history
+                if (action.type === 'UPDATE_NODE_DATA') {
+                    const keys = Object.keys(action.payload.data);
+                    const isTransient = keys.length > 0 && keys.every(k => k === 'currentFrame' || k === 'isPlaying');
+                    if (isTransient) {
+                        return { ...state, present: newPresent };
+                    }
+                }
                 return {
                     past: [...state.past, state.present].slice(-MAX_HISTORY),
                     present: newPresent,
